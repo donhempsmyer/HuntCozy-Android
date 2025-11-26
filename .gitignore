@@ -1,0 +1,30 @@
+# IDE files
+*.iml
+.idea/
+.DS_Store
+
+# Gradle
+.gradle/
+build/
+app/build/
+*/build/
+
+# Local configuration
+local.properties
+
+# Native / external builds
+.externalNativeBuild/
+.cxx/
+
+# Captures
+captures/
+
+# Logs
+*.log
+
+# Signed artifacts
+*.apk
+*.aab
+*.keystore
+*.jks
+*.pem
