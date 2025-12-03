@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/text_gear_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Lofted insulated jacket"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/text_gear_zone_layer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TORSO · INSULATION" />
+
+    <TextView
+        android:id="@+id/text_gear_material"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Synthetic insulation" />
+
+    <TextView
+        android:id="@+id/text_gear_attributes"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Insulation 8 • Wind 2 • Water 1 • Breathability 4" />
+</LinearLayout>

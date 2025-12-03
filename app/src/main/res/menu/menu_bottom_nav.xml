@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/nav_home"
+        android:title="Home"
+        android:icon="@drawable/ic_launcher_foreground" />
+
+    <item
+        android:id="@+id/nav_locations"
+        android:title="Locations"
+        android:icon="@drawable/ic_launcher_foreground" />
+
+    <item
+        android:id="@+id/nav_conditions"
+        android:title="Conditions"
+        android:icon="@drawable/ic_launcher_foreground" />
+
+    <item
+        android:id="@+id/nav_closet"
+        android:title="Closet"
+        android:icon="@drawable/ic_launcher_foreground" />
+
+    <item
+        android:id="@+id/nav_packing_list"
+        android:title="Packing"
+        android:icon="@drawable/ic_launcher_foreground" />
+
+</menu>

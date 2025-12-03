@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/home_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Full-bleed background image -->
+    <ImageView
+        android:id="@+id/image_background_forest"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_winter_forest_dark" />
+
+    <!-- Image by <a href="https://pixabay.com/users/ssidde-19562401/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=5864063">SSidde</a>
+     from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=5864063">Pixabay</a> -->
+
+    <!-- Translucent overlay content -->
+    <LinearLayout
+        android:id="@+id/home_content"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp"
+        android:gravity="top"
+        android:background="#80000000"> <!-- semi-transparent black -->
+
+        <!-- Top: Current weather for selected location -->
+        <LinearLayout
+            android:id="@+id/layout_current_weather"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp"
+            android:background="#40FFFFFF"> <!-- translucent white -->
+
+            <TextView
+                android:id="@+id/text_location_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="North Ridge Stand"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/text_current_temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-5°C (Feels -10°C)"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/text_current_wind"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Wind 15 km/h NW"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/text_current_precip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Light snow · Pressure 1012 hPa"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <!-- Location dropdown -->
+        <Spinner
+            android:id="@+id/spinner_location"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#40FFFFFF" />
+
+        <!-- Forecast section (7-day or hourly) -->
+        <LinearLayout
+            android:id="@+id/layout_forecast_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp"
+            android:background="#40FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/text_forecast_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="7-Day Forecast"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/button_back_to_daily"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Back"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_forecast"
+                android:layout_width="match_parent"
+                android:layout_height="100dp"
+                android:padding="4dp"
+                android:clipToPadding="false" />
+        </LinearLayout>
+
+        <!-- Weapon + Hunting style selection -->
+        <LinearLayout
+            android:id="@+id/layout_selectors"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp"
+            android:background="#40FFFFFF"
+            android:padding="8dp">
+
+            <Spinner
+                android:id="@+id/spinner_weapon"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <Spinner
+                android:id="@+id/spinner_hunting_style"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <!-- Recommended gear list (clickable -> Packing List) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_gear"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="12dp"
+            android:background="#40FFFFFF"
+            android:clipToPadding="false"
+            android:padding="4dp" />
+
+    </LinearLayout>
+
+</FrameLayout>

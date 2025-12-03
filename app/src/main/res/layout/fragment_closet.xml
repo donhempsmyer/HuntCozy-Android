@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/closet_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Main content -->
+    <LinearLayout
+        android:id="@+id/layout_closet_content"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/text_closet_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="My Closet"
+            android:textStyle="bold"
+            android:textSize="20sp" />
+
+        <!-- later we can add filters here (BodyZone, LayerType, MaterialType) -->
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_closet"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/text_empty_closet"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No gear yet."
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Fab for adding new gear (future: opens AddGear screen) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_gear"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:contentDescription="Add gear"
+        app:srcCompat="@drawable/ic_add"
+        app:layout_anchor="@id/layout_closet_content"
+        app:layout_anchorGravity="bottom|end" />
+
+
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
