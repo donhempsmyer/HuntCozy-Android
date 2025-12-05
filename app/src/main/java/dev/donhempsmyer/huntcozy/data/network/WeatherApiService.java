@@ -17,7 +17,11 @@ public interface WeatherApiService {
             @Query("hourly") String hourly,
             @Query("daily") String daily,
             @Query("timezone") String timezone,
-            @Query("forecast_days") int forecastDays
+            @Query("forecast_days") int forecastDays,
+            @Query("temperature_unit") String temperatureUnit,
+            @Query("wind_speed_unit") String windSpeedUnit,
+            @Query("precipitation_unit") String precipitationUnit,
+            @Query("snowfall_unit") String snowfallUnit
     );
 
     // Alternate approach:

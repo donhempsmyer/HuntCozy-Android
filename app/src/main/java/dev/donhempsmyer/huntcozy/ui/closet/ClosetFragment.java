@@ -24,7 +24,8 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
  * v1: read-only list seeded by ClosetSeeder.
  * v2: add/edit gear and persist via Firebase/Room.
  */
-public class ClosetFragment extends Fragment {
+public class ClosetFragment extends Fragment
+        implements AddGearDialogFragment.Listener, EditGearDialogFragment.Listener {
 
     private static final String TAG = "ClosetFragment";
 
@@ -37,6 +38,7 @@ public class ClosetFragment extends Fragment {
 
     private RecyclerView recyclerCloset;
     private TextView textEmptyCloset;
+    private TextView textClosetCount;
     private FloatingActionButton fabAddGear;
 
     @Nullable
@@ -66,6 +68,7 @@ public class ClosetFragment extends Fragment {
         recyclerCloset = root.findViewById(R.id.recycler_closet);
         textEmptyCloset = root.findViewById(R.id.text_empty_closet);
         fabAddGear = root.findViewById(R.id.fab_add_gear);
+        textClosetCount = root.findViewById(R.id.text_closet_count);
     }
 
     private void setupRecycler() {
@@ -83,6 +86,11 @@ public class ClosetFragment extends Fragment {
             Log.d(TAG, "observeViewModel: closet gear count=" + count);
             adapter.setItems(gearItems);
 
+            if (textClosetCount != null) {
+                String label = count + (count == 1 ? " item" : " items");
+                textClosetCount.setText(label);
+            }
+
             if (count == 0) {
                 textEmptyCloset.setVisibility(View.VISIBLE);
                 recyclerCloset.setVisibility(View.GONE);
@@ -95,15 +103,63 @@ public class ClosetFragment extends Fragment {
 
     private void setupFab() {
         fabAddGear.setOnClickListener(v -> {
-            Log.d(TAG, "onClick: fabAddGear (Add Gear stub)");
-            // v1: just log. v2: navigate to AddGearFragment / dialog.
+            Log.d(TAG, "onClick: fabAddGear -> show AddGearDialogFragment");
+            AddGearDialogFragment dialog = new AddGearDialogFragment();
+            dialog.show(getChildFragmentManager(), "addGear");
         });
     }
 
     private void onGearClicked(GearItem item) {
         Log.d(TAG, "onGearClicked: " + item.getName());
-        // v1: no-op or maybe show a Toast.
-        // v2: navigate to GearDetailFragment for editing, etc.
+
+        // Simple options dialog: Edit / Delete / Cancel
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle(item.getName())
+                .setItems(new CharSequence[]{"Edit", "Delete", "Cancel"}, (dialog, which) -> {
+                    switch (which) {
+                        case 0: // Edit
+                            showEditDialog(item);
+                            break;
+                        case 1: // Delete
+                            confirmDelete(item);
+                            break;
+                        case 2: // Cancel
+                        default:
+                            dialog.dismiss();
+                            break;
+                    }
+                })
+                .show();
+    }
+
+    @Override
+    public void onGearCreated(GearItem item) {
+        Log.d(TAG, "onGearCreated: " + item.getName());
+        viewModel.addGear(item);
+    }
+
+    @Override
+    public void onGearEdited(GearItem item) {
+        Log.d(TAG, "onGearEdited: " + item.getName());
+        viewModel.updateGear(item);
+    }
+
+    private void showEditDialog(GearItem item) {
+        Log.d(TAG, "showEditDialog: " + item.getName());
+        EditGearDialogFragment dialog = EditGearDialogFragment.newInstance(item);
+        dialog.show(getChildFragmentManager(), "editGear");
+    }
+
+    private void confirmDelete(GearItem item) {
+        Log.d(TAG, "confirmDelete: " + item.getName());
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Delete gear")
+                .setMessage("Remove \"" + item.getName() + "\" from your closet?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    viewModel.deleteGear(item.getId());
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .show();
     }
 
     // Alternate approach:

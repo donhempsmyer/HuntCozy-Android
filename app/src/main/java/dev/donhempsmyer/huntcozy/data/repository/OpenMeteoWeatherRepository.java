@@ -51,7 +51,11 @@ public class OpenMeteoWeatherRepository implements WeatherRepository {
                 HOURLY_PARAMS,
                 DAILY_PARAMS,
                 "auto",
-                7
+                7,
+                "fahrenheit",   // temperature_unit
+                "mph",          // wind_speed_unit
+                "inch",         // precipitation_unit
+                "inch"          // snowfall_unit
         );
 
         call.enqueue(new Callback<WeatherResponse>() {

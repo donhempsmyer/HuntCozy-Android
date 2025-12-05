@@ -6,50 +6,80 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Main content -->
+    <!-- Full-bleed forest background (same style as Home) -->
+    <ImageView
+        android:id="@+id/image_closet_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_winter_forest_dark" />
+
+    <!-- Translucent overlay card for content -->
     <LinearLayout
         android:id="@+id/layout_closet_content"
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:background="#80000000">
 
-        <TextView
-            android:id="@+id/text_closet_title"
-            android:layout_width="wrap_content"
+        <!-- Header row: title + gear count placeholder -->
+        <LinearLayout
+            android:id="@+id/layout_closet_header"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="My Closet"
-            android:textStyle="bold"
-            android:textSize="20sp" />
+            android:fitsSystemWindows="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <!-- later we can add filters here (BodyZone, LayerType, MaterialType) -->
+            <TextView
+                android:id="@+id/text_closet_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="My Closet"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/text_closet_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 items"
+                android:textColor="@android:color/white" />
+        </LinearLayout>
+
+        <!-- (Future) Filters row – BodyZone / LayerType could go here -->
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler_closet"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="8dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="88dp" />
 
         <TextView
             android:id="@+id/text_empty_closet"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="No gear yet."
+            android:text="No gear yet. Tap + to add your first item."
+            android:textColor="@android:color/white"
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Fab for adding new gear (future: opens AddGear screen) -->
+    <!-- Fab for adding new gear -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_add_gear"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="108dp"
         android:contentDescription="Add gear"
         app:srcCompat="@drawable/ic_add"
         app:layout_anchor="@id/layout_closet_content"
         app:layout_anchorGravity="bottom|end" />
-
-
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

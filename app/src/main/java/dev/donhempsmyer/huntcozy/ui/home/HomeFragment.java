@@ -215,17 +215,17 @@ public class HomeFragment extends Fragment {
                 ? viewModel.getSelectedLocation().getValue().getName()
                 : "Selected Location");
 
-        String tempText = String.format("%.0f°C (Feels %.0f°C)",
+        String tempText = String.format("%.0f°F (Feels %.0f°F)",
                 response.current.temperature2m,
                 response.current.apparentTemperature);
         textCurrentTemp.setText(tempText);
 
-        String windText = String.format("Wind %.0f km/h %.0f°",
+        String windText = String.format("Wind %.0f mph %.0f°",
                 response.current.windSpeed10m,
                 response.current.windDirection10m);
         textCurrentWind.setText(windText);
 
-        String precipText = String.format("Precip %.1f mm · Snow %.1f cm · Pressure %.0f hPa",
+        String precipText = String.format("Precip %.2f in · Snow %.2f in · Pressure %.0f hPa",
                 response.current.precipitation,
                 response.current.snowfall,
                 response.current.pressureMsl);

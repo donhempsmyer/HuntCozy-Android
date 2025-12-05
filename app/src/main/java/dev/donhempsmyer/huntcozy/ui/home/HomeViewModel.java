@@ -51,7 +51,7 @@ public class HomeViewModel extends ViewModel {
         Log.d(TAG, "constructor: initializing sample locations");
         List<LocationModel> sample = Arrays.asList(
                 new LocationModel("loc1", "North Ridge Stand", 44.5, -89.5),
-                new LocationModel("loc2", "Marsh Blind", 44.3, -89.3)
+                new LocationModel("loc2", "Marsh Blind", 54.3, -99.3)
         );
         locationsLiveData.setValue(sample);
         if (!sample.isEmpty()) {
@@ -128,20 +128,25 @@ public class HomeViewModel extends ViewModel {
 
         List<GearItem> closet = closetRepository.getAllGear().getValue();
         if (closet == null || closet.isEmpty()) {
-            Log.w(TAG, "recomputeGear: closet is empty, no recommendations");
+            Log.w(TAG, "recomputeGear: closet is empty, no outfit can be built");
             gearLiveData.setValue(null);
             return;
         }
 
         CurrentWeather current = response.current;
-        List<GearItem> recommended = gearRecommender.recommendFromCloset(
+
+        // v1: use current conditions as a proxy for the hunt window.
+        // Later: replace with a HuntWindowConditions derived from hourly forecast
+        // for Morning/Mid, Mid/Evening, or All-Day windows.
+        List<GearItem> outfit = gearRecommender.buildOutfitFromCloset(
                 closet,
                 current,
                 weaponType,
                 huntingStyle
         );
 
-        gearLiveData.setValue(recommended);
+        Log.d(TAG, "recomputeGear: outfit size=" + (outfit != null ? outfit.size() : 0));
+        gearLiveData.setValue(outfit);
     }
 
     // Alternate approach:
