@@ -406,24 +406,29 @@ public class GearRecommender {
                 break;
 
             case MILD:
-                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.HEADGEAR, true));
+                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.BASE, false));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
                 break;
 
             case COOL:
-                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.HEADGEAR, true));
+                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.BASE, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
                 break;
 
             case COLD:
+                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.INSULATED_HEADGEAR, true));
+                if (wet) {
+                    slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
+                }
+                break;
             case VERY_COLD:
                 // In colder bands we still just pick one HEADGEAR item,
                 // but the recommender should prefer higher-insulation pieces.
-                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.HEADGEAR, true));
+                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.INSULATED_HEADGEAR, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
@@ -466,9 +471,15 @@ public class GearRecommender {
                 break;
 
             case COLD:
+                slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.INSULATED_GLOVE, true));
+                if (wet) {
+                    slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.RAIN, true));
+                }
+                break;
+
             case VERY_COLD:
                 // In cold/very cold, gloves are effectively required
-                slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.GLOVE, true));
+                slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.INSULATED_GLOVE, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.RAIN, true));
                 }
@@ -494,6 +505,13 @@ public class GearRecommender {
 
         switch (tempBand) {
             case HOT:
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.SOCK, true));
+                if (wet) {
+                    slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, false));
+                }
+                break;
+
             case MILD:
                 // In warm temps, a sock + standard footwear is usually enough.
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.SOCK, true));
@@ -512,10 +530,17 @@ public class GearRecommender {
                 break;
 
             case COLD:
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.INSULATED_SOCK, true));
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
+                if (wet) {
+                    slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, true));
+                }
+                break;
+
             case VERY_COLD:
                 // Cold: socks + insulated footwear basically required.
-                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.SOCK, true));
-                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.INSULATED_SOCK, true));
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.INSULATED_FOOTWEAR, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, true));
                 }

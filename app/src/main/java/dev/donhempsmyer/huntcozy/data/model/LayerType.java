@@ -12,9 +12,12 @@ public enum LayerType {
     SHELL,        // windproof / weather shell
     RAIN,         // true rain gear (can be layered over shell)
     FOOTWEAR,
+    INSULATED_FOOTWEAR,
     SOCK,
+    INSULATED_SOCK,
     GLOVE,
+    INSULATED_GLOVE,
     HEADGEAR,
+    INSULATED_HEADGEAR,
     ACCESSORY,
-    PACK
 }
