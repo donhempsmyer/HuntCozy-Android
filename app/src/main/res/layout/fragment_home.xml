@@ -115,6 +115,42 @@
                 android:clipToPadding="false" />
         </LinearLayout>
 
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/group_hunt_window"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_window_morning_mid"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Morning–Mid"
+                android:textColor="@color/white"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_window_mid_evening"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Mid–Evening"
+                android:textColor="@color/white"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_window_all_day"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="All-Day"
+                android:textColor="@color/white"/>
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
         <!-- Weapon + Hunting style selection -->
         <LinearLayout
             android:id="@+id/layout_selectors"
@@ -148,7 +184,7 @@
             android:layout_marginTop="12dp"
             android:background="#40FFFFFF"
             android:clipToPadding="false"
-            android:padding="4dp" />
+            android:padding="4dp"/>
 
     </LinearLayout>
 

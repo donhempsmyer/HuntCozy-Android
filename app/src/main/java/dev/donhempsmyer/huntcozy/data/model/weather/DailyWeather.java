@@ -6,8 +6,6 @@ import java.util.List;
 
 public class DailyWeather {
 
-    public List<String> time;
-
     @SerializedName("temperature_2m_max")
     public List<Double> temperatureMax;
 
@@ -20,6 +18,12 @@ public class DailyWeather {
     @SerializedName("snowfall_sum")
     public List<Double> snowfallSum;
 
-    public List<String> sunrise;
-    public List<String> sunset;
+    @SerializedName("time")
+    public List<String> time;        // "2025-12-06"
+
+    @SerializedName("sunrise")
+    public List<String> sunrise;     // "2025-12-06T07:14"
+
+    @SerializedName("sunset")
+    public List<String> sunset;      // "2025-12-06T16:30"
 }

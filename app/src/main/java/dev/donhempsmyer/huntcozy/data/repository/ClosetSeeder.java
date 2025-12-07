@@ -21,7 +21,7 @@ public class ClosetSeeder {
                 // HEAD
                 new GearItem("Merino beanie",
                         BodyZone.HEAD,
-                        LayerType.HEADGEAR,
+                        LayerType.BASE,
                         MaterialType.MERINO_WOOL,
                         new GearAttributes(
                                 3,  // insulation
@@ -181,7 +181,7 @@ public class ClosetSeeder {
                 // FOOTWEAR
                 new GearItem("400g insulated boots",
                         BodyZone.FEET,
-                        LayerType.FOOTWEAR,
+                        LayerType.INSULATED_FOOTWEAR,
                         MaterialType.LEATHER,
                         new GearAttributes(
                                 6,
@@ -220,7 +220,7 @@ public class ClosetSeeder {
                 // HANDS
                 new GearItem("Insulated shooting glove",
                         BodyZone.HANDS,
-                        LayerType.GLOVE,
+                        LayerType.INSULATED_GLOVE,
                         MaterialType.SYNTHETIC_INSULATION,
                         new GearAttributes(
                                 6,

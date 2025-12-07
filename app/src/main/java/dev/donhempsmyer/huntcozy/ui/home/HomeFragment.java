@@ -27,6 +27,10 @@ import dev.donhempsmyer.huntcozy.data.model.weather.DailyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.HourlyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.WeatherResponse;
 import dev.donhempsmyer.huntcozy.ui.packing.PackingListFragment;
+import dev.donhempsmyer.huntcozy.data.model.HuntWindow;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -54,7 +58,12 @@ public class HomeFragment extends Fragment {
     private RecyclerView recyclerForecast;
     private RecyclerView recyclerGear;
     private TextView textForecastTitle;
-    private Button buttonBackToDaily;
+    private Button buttonBackToDaily;private MaterialButtonToggleGroup groupHuntWindow;
+    private MaterialButton btnMorningMid;
+    private MaterialButton btnMidEvening;
+    private MaterialButton btnAllDay;
+
+
 
     private ForecastAdapter forecastAdapter;
     private GearAdapter gearAdapter;
@@ -86,6 +95,7 @@ public class HomeFragment extends Fragment {
         setupHuntingStyleSpinner();
         setupForecastRecycler();
         setupGearRecycler();
+        setupHuntWindowToggle();
         observeViewModel();
     }
 
@@ -101,6 +111,11 @@ public class HomeFragment extends Fragment {
         recyclerGear = root.findViewById(R.id.recycler_gear);
         textForecastTitle = root.findViewById(R.id.text_forecast_title);
         buttonBackToDaily = root.findViewById(R.id.button_back_to_daily);
+
+        groupHuntWindow = root.findViewById(R.id.group_hunt_window);
+        btnMorningMid = root.findViewById(R.id.btn_window_morning_mid);
+        btnMidEvening = root.findViewById(R.id.btn_window_mid_evening);
+        btnAllDay = root.findViewById(R.id.btn_window_all_day);
 
         buttonBackToDaily.setOnClickListener(v -> showDailyForecast());
     }
@@ -190,6 +205,49 @@ public class HomeFragment extends Fragment {
         recyclerGear.setLayoutManager(
                 new LinearLayoutManager(requireContext(), RecyclerView.VERTICAL, false));
         recyclerGear.setAdapter(gearAdapter);
+    }
+
+    private void setupHuntWindowToggle() {
+        // Default to All-Day
+        groupHuntWindow.check(R.id.btn_window_all_day);
+        viewModel.setHuntWindow(HuntWindow.ALL_DAY);
+
+        groupHuntWindow.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) return;
+
+            HuntWindow window;
+            if (checkedId == R.id.btn_window_morning_mid) {
+                window = HuntWindow.MORNING_MID;
+            } else if (checkedId == R.id.btn_window_mid_evening) {
+                window = HuntWindow.MID_EVENING;
+            } else {
+                window = HuntWindow.ALL_DAY;
+            }
+
+            viewModel.setHuntWindow(window);
+        });
+
+        // Optional: observe changes from the ViewModel to keep UI in sync
+        viewModel.getHuntWindow().observe(getViewLifecycleOwner(), window -> {
+            if (window == null) return;
+            int id;
+            switch (window) {
+                case MORNING_MID:
+                    id = R.id.btn_window_morning_mid;
+                    break;
+                case MID_EVENING:
+                    id = R.id.btn_window_mid_evening;
+                    break;
+                case ALL_DAY:
+                default:
+                    id = R.id.btn_window_all_day;
+                    break;
+            }
+
+            if (groupHuntWindow.getCheckedButtonId() != id) {
+                groupHuntWindow.check(id);
+            }
+        });
     }
 
     private void observeViewModel() {

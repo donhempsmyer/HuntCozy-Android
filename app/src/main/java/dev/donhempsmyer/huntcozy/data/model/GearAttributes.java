@@ -21,8 +21,8 @@ public class GearAttributes {
 
     // Comfort temp range in °C for "typical" stationary use.
     // Recommender can adjust based on activity level and user feedback.
-    private final double comfortTempMinC;
-    private final double comfortTempMaxC;
+    private final double comfortTempMinF;
+    private final double comfortTempMaxF;
 
     // Flags for special behavior
     private final boolean scentControl;
@@ -39,8 +39,8 @@ public class GearAttributes {
             int breathabilityLevel,
             int noiseLevel,
             int mobilityLevel,
-            double comfortTempMinC,
-            double comfortTempMaxC,
+            double comfortTempMinF,
+            double comfortTempMaxF,
             boolean scentControl,
             boolean quietFaceFabric,
             int weightLevel,
@@ -52,8 +52,8 @@ public class GearAttributes {
         this.breathabilityLevel = clamp(breathabilityLevel);
         this.noiseLevel = clamp(noiseLevel);
         this.mobilityLevel = clamp(mobilityLevel);
-        this.comfortTempMinC = comfortTempMinC;
-        this.comfortTempMaxC = comfortTempMaxC;
+        this.comfortTempMinF = comfortTempMinF;
+        this.comfortTempMaxF = comfortTempMaxF;
         this.scentControl = scentControl;
         this.quietFaceFabric = quietFaceFabric;
         this.weightLevel = clamp(weightLevel);
@@ -62,7 +62,7 @@ public class GearAttributes {
         Log.d(TAG, "GearAttributes created: insulation=" + this.insulationLevel
                 + " wind=" + this.windProofLevel
                 + " water=" + this.waterProofLevel
-                + " tempRange=" + this.comfortTempMinC + " to " + this.comfortTempMaxC);
+                + " tempRange=" + this.comfortTempMinF + " to " + this.comfortTempMaxF);
     }
 
     private int clamp(int value) {
@@ -77,8 +77,8 @@ public class GearAttributes {
     public int getBreathabilityLevel() { return breathabilityLevel; }
     public int getNoiseLevel() { return noiseLevel; }
     public int getMobilityLevel() { return mobilityLevel; }
-    public double getComfortTempMinC() { return comfortTempMinC; }
-    public double getComfortTempMaxC() { return comfortTempMaxC; }
+    public double getComfortTempMinF() { return comfortTempMinF; }
+    public double getComfortTempMaxF() { return comfortTempMaxF; }
     public boolean hasScentControl() { return scentControl; }
     public boolean hasQuietFaceFabric() { return quietFaceFabric; }
     public int getWeightLevel() { return weightLevel; }

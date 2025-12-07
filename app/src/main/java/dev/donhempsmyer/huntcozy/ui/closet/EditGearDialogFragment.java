@@ -67,8 +67,8 @@ public class EditGearDialogFragment extends DialogFragment {
             args.putInt(ARG_BREATH, a.getBreathabilityLevel());
             args.putInt(ARG_NOISE, a.getNoiseLevel());
             args.putInt(ARG_MOBILITY, a.getMobilityLevel());
-            args.putDouble(ARG_TEMP_MIN, a.getComfortTempMinC());
-            args.putDouble(ARG_TEMP_MAX, a.getComfortTempMaxC());
+            args.putDouble(ARG_TEMP_MIN, a.getComfortTempMinF());
+            args.putDouble(ARG_TEMP_MAX, a.getComfortTempMaxF());
             args.putBoolean(ARG_SCENT, a.hasScentControl());
             args.putBoolean(ARG_QUIET, a.hasQuietFaceFabric());
             args.putInt(ARG_WEIGHT, a.getWeightLevel());

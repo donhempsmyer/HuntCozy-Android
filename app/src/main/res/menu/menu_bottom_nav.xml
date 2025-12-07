@@ -4,26 +4,26 @@
     <item
         android:id="@+id/nav_home"
         android:title="Home"
-        android:icon="@drawable/ic_launcher_foreground" />
+        android:icon="@drawable/home_24px" />
 
     <item
         android:id="@+id/nav_locations"
         android:title="Locations"
-        android:icon="@drawable/ic_launcher_foreground" />
+        android:icon="@drawable/location_on_24px" />
 
     <item
         android:id="@+id/nav_conditions"
         android:title="Conditions"
-        android:icon="@drawable/ic_launcher_foreground" />
+        android:icon="@drawable/airwave_24px" />
 
     <item
         android:id="@+id/nav_closet"
         android:title="Closet"
-        android:icon="@drawable/ic_launcher_foreground" />
+        android:icon="@drawable/apparel_24px" />
 
     <item
         android:id="@+id/nav_packing_list"
         android:title="Packing"
-        android:icon="@drawable/ic_launcher_foreground" />
+        android:icon="@drawable/bucket_check_24px" />
 
 </menu>

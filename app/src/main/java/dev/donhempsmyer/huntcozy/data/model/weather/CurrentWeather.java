@@ -27,4 +27,10 @@ public class CurrentWeather {
 
     @SerializedName("pressure_msl")
     public double pressureMsl;
+
+    @SerializedName("relative_humidity_2m")
+    public double relativeHumidity;
+
+    @SerializedName("cloud_cover")
+    public double cloudCover;
 }

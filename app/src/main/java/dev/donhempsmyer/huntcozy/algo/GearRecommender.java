@@ -12,7 +12,6 @@ import dev.donhempsmyer.huntcozy.data.model.GearAttributes;
 import dev.donhempsmyer.huntcozy.data.model.GearItem;
 import dev.donhempsmyer.huntcozy.data.model.HuntingStyle;
 import dev.donhempsmyer.huntcozy.data.model.LayerType;
-import dev.donhempsmyer.huntcozy.data.model.MaterialType;
 import dev.donhempsmyer.huntcozy.data.model.WeaponType;
 import dev.donhempsmyer.huntcozy.data.model.weather.CurrentWeather;
 
@@ -115,14 +114,16 @@ public class GearRecommender {
 
         // v1: use raw temperature as "effective"; later we can integrate
         // apparentTemperature and wind into a better feels-like metric.
-        double effectiveTempF = current.temperature2m;
+        double rawTempF = current.temperature2m;
+        double apparentTempF = current.apparentTemperature;
         double windMph = current.windSpeed10m;
         double precipTotalIn = current.precipitation + current.snowfall;
 
-        TempBand tempBand = classifyTempBand(effectiveTempF);
+        TempBand tempBand = classifyTempBand(apparentTempF);
         PrecipBand precipBand = classifyPrecipBand(precipTotalIn);
 
-        Log.d(TAG, "buildOutfitFromCloset: temp=" + effectiveTempF
+        Log.d(TAG, "buildOutfitFromCloset: rawTemp=" + rawTempF
+                + "F apparentTemp=" + apparentTempF
                 + "F band=" + tempBand
                 + " wind=" + windMph + " mph"
                 + " precipTotal=" + precipTotalIn + " in band=" + precipBand
@@ -142,7 +143,7 @@ public class GearRecommender {
             GearItem best = selectBestItemForSlot(
                     closet,
                     slot,
-                    effectiveTempF,
+                    apparentTempF,
                     windMph,
                     precipTotalIn,
                     weaponType,
@@ -557,7 +558,7 @@ public class GearRecommender {
     private GearItem selectBestItemForSlot(
             List<GearItem> closet,
             OutfitSlot slot,
-            double tempF,
+            double apparentTempF,
             double windMph,
             double precipIn,
             WeaponType weaponType,
@@ -573,7 +574,7 @@ public class GearRecommender {
 
             double score = scoreItemForSlot(
                     item,
-                    tempF,
+                    apparentTempF,
                     windMph,
                     precipIn,
                     weaponType,
@@ -596,14 +597,14 @@ public class GearRecommender {
      */
     private double scoreItemForSlot(
             GearItem item,
-            double tempF,
+            double apparentTempF,
             double windMph,
             double precipIn,
             WeaponType weaponType,
             HuntingStyle style,
             OutfitSlot slot
     ) {
-        double baseScore = scoreItem(item, tempF, windMph, precipIn, weaponType, style);
+        double baseScore = scoreItem(item, apparentTempF, windMph, precipIn, weaponType, style);
 
         // TODO: refine by slot, for example:
         //  - if slot.layerType == INSULATION, weight insulation more heavily.
@@ -616,7 +617,7 @@ public class GearRecommender {
      */
     private double scoreItem(
             GearItem item,
-            double tempF,
+            double apparentTempF,
             double windMph,
             double precipIn,
             WeaponType weaponType,
@@ -625,43 +626,120 @@ public class GearRecommender {
         GearAttributes attrs = item.getAttributes();
         if (attrs == null) return 0.0;
 
+        TempBand band = classifyTempBand(apparentTempF); // use apparent temp to understand how cold it feels
+
+
         // Temperature component
         double tempScore;
-        if (tempF < attrs.getComfortTempMinC()) {
+        if (apparentTempF < attrs.getComfortTempMinF()) {
             tempScore = attrs.getInsulationLevel() * 0.5;
-        } else if (tempF > attrs.getComfortTempMaxC()) {
+        } else if (apparentTempF > attrs.getComfortTempMaxF()) {
             tempScore = attrs.getBreathabilityLevel() * 0.5;
         } else {
             tempScore = 8.0;
         }
 
         // Wind component
-        double windScore = (windMph > 20.0)
-                ? attrs.getWindProofLevel()
-                : attrs.getWindProofLevel() * 0.3;
+        double windScore = computeWindScoreForBand(attrs, band, windMph);
+
 
         // Precip component (rain + snow combined)
         double precipScore = (precipIn > 0.5)
                 ? attrs.getWaterProofLevel()
                 : attrs.getWaterProofLevel() * 0.2;
 
-        // Style bonus
+        // Style bonus – depends on hunting style, temp band, and wind
         double styleBonus = 0.0;
+        boolean midWind = windMph > 3.0 && windMph <= 7.0;
+        boolean highWind = windMph > 7.0;
+
         switch (huntingStyle) {
-            case TREESTAND:
-                styleBonus += (10 - attrs.getNoiseLevel()) * 0.5;
-                styleBonus += attrs.getInsulationLevel() * 0.3;
+            case TREESTAND: {
+                // Sitting still; insulation and windproofness matter a lot.
+                // Noise still matters but less than in run-and-gun styles.
+
+                double insWeight;
+                if (band == TempBand.COLD || band == TempBand.VERY_COLD) {
+                    insWeight = 0.9;
+                } else if (band == TempBand.COOL) {
+                    insWeight = 0.6;
+                } else {
+                    insWeight = 0.3;
+                }
+
+                double windWeight = highWind ? 0.8 : (midWind ? 0.6 : 0.4);
+                double noiseWeight = 0.15; // small influence
+
+                styleBonus += attrs.getInsulationLevel() * insWeight;
+                styleBonus += attrs.getWindProofLevel() * windWeight;
+                styleBonus += (10 - attrs.getNoiseLevel()) * noiseWeight;
                 break;
-            case SPOT_AND_STALK:
-                styleBonus += attrs.getMobilityLevel() * 0.6;
-                styleBonus += attrs.getBreathabilityLevel() * 0.3;
+            }
+
+            case GROUND_BLIND: {
+                // Inside a blind: still (need insulation), but more shielded from wind.
+                // Noise is somewhat masked by the blind.
+
+                double insWeight;
+                if (band == TempBand.COLD || band == TempBand.VERY_COLD) {
+                    insWeight = 0.8;
+                } else if (band == TempBand.COOL) {
+                    insWeight = 0.5;
+                } else {
+                    insWeight = 0.3;
+                }
+
+                double windWeight = highWind ? 0.3 : 0.15;  // wind less important than treestand
+                double noiseWeight = 0.1;                   // noise matters, but not a top concern
+
+                styleBonus += attrs.getInsulationLevel() * insWeight;
+                styleBonus += attrs.getWindProofLevel() * windWeight;
+                styleBonus += (10 - attrs.getNoiseLevel()) * noiseWeight;
                 break;
-            case GROUND_BLIND:
-            case STILL_HUNTING:
-                styleBonus += (10 - attrs.getNoiseLevel()) * 0.3;
-                styleBonus += attrs.getInsulationLevel() * 0.3;
+            }
+
+            case SPOT_AND_STALK: {
+                // Moving a lot: mobility, low bulk, and breathability are key.
+                // Low noise is important, but high wind can mask some sound.
+
+                double noiseWeight = highWind ? 0.25 : 0.6; // wind masks some noise when high
+                double mobilityWeight = 0.7;
+                double bulkWeight = 0.6;
+                double breathWeight = 0.4;
+
+                styleBonus += attrs.getMobilityLevel() * mobilityWeight;
+                styleBonus += (10 - attrs.getBulkLevel()) * bulkWeight; // lower bulk is better
+                styleBonus += (10 - attrs.getNoiseLevel()) * noiseWeight;
+                styleBonus += attrs.getBreathabilityLevel() * breathWeight;
                 break;
+            }
+
+            case STILL_HUNTING: {
+                // Slow, deliberate movement: need to be quiet, reasonably warm,
+                // and able to move without fighting bulk.
+
+                double noiseWeight = highWind ? 0.3 : 0.55;
+                double mobilityWeight = 0.6;
+                double bulkWeight = 0.5;
+
+                double insWeight;
+                if (band == TempBand.HOT || band == TempBand.MILD) {
+                    insWeight = 0.15; // too much insulation is bad in warm bands
+                } else if (band == TempBand.COOL) {
+                    insWeight = 0.4;
+                } else { // COLD or VERY_COLD
+                    insWeight = 0.8;
+                }
+
+                styleBonus += attrs.getMobilityLevel() * mobilityWeight;
+                styleBonus += (10 - attrs.getBulkLevel()) * bulkWeight;
+                styleBonus += (10 - attrs.getNoiseLevel()) * noiseWeight;
+                styleBonus += attrs.getInsulationLevel() * insWeight;
+                break;
+            }
+
             default:
+                // No extra style bias
                 break;
         }
 
@@ -674,10 +752,79 @@ public class GearRecommender {
         double score = tempScore + windScore + precipScore + styleBonus + weaponBonus;
 
         Log.d(TAG, "scoreItem: " + item.getName() + " score=" + score
-                + " (tempF=" + tempF
+                + " (tempF=" + apparentTempF
                 + ", wind=" + windMph
                 + ", precipIn=" + precipIn + ")");
         return score;
+    }
+
+    /**
+     * Wind score that respects both the temp band (how dangerous wind is)
+     * and your wind thresholds (<=3 low, <=7 mid, >7 high).
+     *
+     * - In HOT/MILD, windproofness matters mostly for comfort.
+     * - In COOL, it matters more.
+     * - In COLD/VERY_COLD, wind can be dangerous, so we lean hard into windproof gear.
+     */
+    private double computeWindScoreForBand(GearAttributes attrs, TempBand band, double windMph) {
+        int windLevel = attrs.getWindProofLevel();
+
+        // Determine low / mid / high wind based on your thresholds
+        boolean lowWind = windMph <= 5.0;
+        boolean midWind = windMph > 5.0 && windMph <= 10.0;
+        boolean highWind = windMph > 10.0;
+
+        double multiplier;
+
+        switch (band) {
+            case HOT:
+            case MILD:
+                // Warm temps: windproof still nice but not critical
+                if (lowWind) {
+                    multiplier = 0.1;
+                } else if (midWind) {
+                    multiplier = 0.3;
+                } else { // highWind
+                    multiplier = 0.5;
+                }
+                break;
+
+            case COOL:
+                // Cool temps: windproofness more important
+                if (lowWind) {
+                    multiplier = 0.2;
+                } else if (midWind) {
+                    multiplier = 0.5;
+                } else { // highWind
+                    multiplier = 0.8;
+                }
+                break;
+
+            case COLD:
+                // Cold temps: wind can seriously increase chill
+                if (lowWind) {
+                    multiplier = 0.3;
+                } else if (midWind) {
+                    multiplier = 0.7;
+                } else { // highWind
+                    multiplier = 1.0;
+                }
+                break;
+
+            case VERY_COLD:
+            default:
+                // Very cold: wind is legitimately dangerous; strongly prefer windproof
+                if (lowWind) {
+                    multiplier = 0.4;
+                } else if (midWind) {
+                    multiplier = 0.9;
+                } else { // highWind
+                    multiplier = 1.3;  // strong bias towards high windproof pieces
+                }
+                break;
+        }
+
+        return windLevel * multiplier;
     }
 
     // Alternate approach:

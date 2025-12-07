@@ -19,5 +19,4 @@ public enum LayerType {
     INSULATED_GLOVE,
     HEADGEAR,
     INSULATED_HEADGEAR,
-    ACCESSORY,
 }

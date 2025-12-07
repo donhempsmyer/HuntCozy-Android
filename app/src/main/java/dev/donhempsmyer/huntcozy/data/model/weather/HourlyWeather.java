@@ -7,10 +7,13 @@ import java.util.List;
 
 public class HourlyWeather {
 
+    @SerializedName("time")
     public List<String> time;
-
     @SerializedName("temperature_2m")
     public List<Double> temperature2m;
+
+    @SerializedName("apparent_temperature")
+    public List<Double> apparentTemperature;
 
     @SerializedName("precipitation")
     public List<Double> precipitation;
