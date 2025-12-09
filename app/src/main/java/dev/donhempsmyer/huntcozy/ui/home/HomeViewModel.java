@@ -1,19 +1,26 @@
 package dev.donhempsmyer.huntcozy.ui.home;
 
-
-import android.os.Build;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
-import androidx.lifecycle.Transformations;
 import androidx.lifecycle.ViewModel;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
+
+import dev.donhempsmyer.huntcozy.algo.GearRecommender;
+import dev.donhempsmyer.huntcozy.data.locations.LocationsRepository;
 import dev.donhempsmyer.huntcozy.data.model.GearItem;
 import dev.donhempsmyer.huntcozy.data.model.HuntWindow;
 import dev.donhempsmyer.huntcozy.data.model.HuntingStyle;
-import dev.donhempsmyer.huntcozy.data.model.LocationModel;
 import dev.donhempsmyer.huntcozy.data.model.WeaponType;
+import dev.donhempsmyer.huntcozy.data.model.location.HuntLocation;
 import dev.donhempsmyer.huntcozy.data.model.weather.CurrentWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.DailyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.HourlyWeather;
@@ -22,41 +29,25 @@ import dev.donhempsmyer.huntcozy.data.repository.ClosetRepository;
 import dev.donhempsmyer.huntcozy.data.repository.ClosetRepositoryProvider;
 import dev.donhempsmyer.huntcozy.data.repository.OpenMeteoWeatherRepository;
 import dev.donhempsmyer.huntcozy.data.repository.WeatherRepository;
-import dev.donhempsmyer.huntcozy.algo.GearRecommender;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.TimeZone;
 
 public class HomeViewModel extends ViewModel {
 
     private static final String TAG = "HomeViewModel";
 
-    private final WeatherRepository weatherRepository = new OpenMeteoWeatherRepository();
+    // Weather + closet + locations
+    private final WeatherRepository weatherRepository = OpenMeteoWeatherRepository.getInstance();    // Alternate: use a singleton if you want shared weather cache
+
     private final ClosetRepository closetRepository = ClosetRepositoryProvider.get();
+    private final LocationsRepository locationsRepository = LocationsRepository.getInstance();
+
     private final GearRecommender gearRecommender = new GearRecommender();
 
-    private final MutableLiveData<List<LocationModel>> locationsLiveData =
-            new MutableLiveData<>();
-
-    private final MutableLiveData<LocationModel> selectedLocationLiveData =
-            new MutableLiveData<>();
-
+    // User selections
     private final MutableLiveData<WeaponType> weaponTypeLiveData =
             new MutableLiveData<>(WeaponType.RIFLE);
 
     private final MutableLiveData<HuntingStyle> huntingStyleLiveData =
             new MutableLiveData<>(HuntingStyle.TREESTAND);
-
 
     private final MutableLiveData<HuntWindow> huntWindowLiveData =
             new MutableLiveData<>(HuntWindow.ALL_DAY);
@@ -66,33 +57,42 @@ public class HomeViewModel extends ViewModel {
             new MutableLiveData<>();
 
     public HomeViewModel() {
-        Log.d(TAG, "constructor: initializing sample locations");
-        List<LocationModel> sample = Arrays.asList(
-                new LocationModel("loc1", "North Ridge Stand", 44.5, -89.5),
-                new LocationModel("loc2", "Marsh Blind", 54.3, -99.3),
-                new LocationModel("loc3", "Marsh stand", 38.29, 122.3)
+        Log.d(TAG, "constructor: HomeViewModel created");
+        // NOTE:
+        // - LocationsRepository is responsible for seeding default locations
+        //   and setting an initial selectedLocation.
+        // - When the user changes locations, HomeFragment calls onLocationSelected().
+    }
 
+    // --- Locations API (used by HomeFragment) ---
+
+    public LiveData<List<HuntLocation>> getLocations() {
+        return locationsRepository.getLocations();
+    }
+
+    public LiveData<HuntLocation> getSelectedLocation() {
+        return locationsRepository.getSelectedLocation();
+    }
+
+    /**
+     * Called by HomeFragment when the user picks a new location from the spinner.
+     * Also used indirectly if another screen (LocationsFragment) changes selection.
+     */
+    public void onLocationSelected(HuntLocation location) {
+        if (location == null) return;
+        Log.d(TAG, "onLocationSelected: " + location);
+        locationsRepository.selectLocation(location);
+
+        // Refresh weather for this location
+        weatherRepository.refreshWeatherForLocation(
+                location.getLatitude(),
+                location.getLongitude()
         );
-        locationsLiveData.setValue(sample);
-        if (!sample.isEmpty()) {
-            selectedLocationLiveData.setValue(sample.get(0));
-            refreshWeather();
-        }
+
+        // When weather finishes updating, HomeFragment's observer will call onWeatherUpdated().
     }
 
-    public LiveData<List<LocationModel>> getLocations() {
-        return locationsLiveData;
-    }
-
-    public LiveData<LocationModel> getSelectedLocation() {
-        return selectedLocationLiveData;
-    }
-
-    public void selectLocation(LocationModel location) {
-        Log.d(TAG, "selectLocation: " + location.getName());
-        selectedLocationLiveData.setValue(location);
-        refreshWeather();
-    }
+    // --- Weather & Hunt window API ---
 
     public LiveData<WeatherResponse> getWeather() {
         return weatherRepository.getWeatherLiveData();
@@ -104,6 +104,14 @@ public class HomeViewModel extends ViewModel {
 
     public LiveData<List<GearItem>> getGear() {
         return gearLiveData;
+    }
+
+    public LiveData<WeaponType> getWeaponType() {
+        return weaponTypeLiveData;
+    }
+
+    public LiveData<HuntingStyle> getHuntingStyle() {
+        return huntingStyleLiveData;
     }
 
     public void setWeaponType(WeaponType type) {
@@ -130,32 +138,22 @@ public class HomeViewModel extends ViewModel {
         recomputeGear();
     }
 
-    public LiveData<WeaponType> getWeaponType() {
-        return weaponTypeLiveData;
-    }
-
-    public LiveData<HuntingStyle> getHuntingStyle() {
-        return huntingStyleLiveData;
-    }
-
-    private void refreshWeather() {
-        LocationModel loc = selectedLocationLiveData.getValue();
-        if (loc != null) {
-            Log.d(TAG, "refreshWeather: " + loc.getName());
-            weatherRepository.fetchWeatherFor(loc);
-        }
-    }
-
+    /**
+     * Called from HomeFragment when weather LiveData emits a new value.
+     */
     public void onWeatherUpdated(WeatherResponse response) {
         Log.d(TAG, "onWeatherUpdated");
         recomputeGear();
     }
+
+    // --- Core recompute logic: Weather + Closet + Selections → Outfit ---
 
     private void recomputeGear() {
         WeatherResponse response = weatherRepository.getWeatherLiveData().getValue();
         WeaponType weaponType = weaponTypeLiveData.getValue();
         HuntingStyle huntingStyle = huntingStyleLiveData.getValue();
         HuntWindow huntWindow = huntWindowLiveData.getValue();
+        HuntLocation loc = locationsRepository.getSelectedLocation().getValue();
 
         if (response == null || response.current == null ||
                 weaponType == null || huntingStyle == null || huntWindow == null) {
@@ -170,9 +168,7 @@ public class HomeViewModel extends ViewModel {
             return;
         }
 
-        // v1: use current conditions as a proxy for the hunt window.
-        // v2: replace this with an hourly-based min/max/wind/precip aggregation
-        // for MORNING_MID / MID_EVENING / ALL_DAY.
+        // Use aggregated "hunt window" weather rather than just current conditions
         CurrentWeather windowWeather = deriveWindowWeather(response, huntWindow);
 
         List<GearItem> outfit = gearRecommender.buildOutfitFromCloset(
@@ -184,19 +180,27 @@ public class HomeViewModel extends ViewModel {
 
         Log.d(TAG, "recomputeGear: window=" + huntWindow
                 + " outfit size=" + (outfit != null ? outfit.size() : 0));
+
+        Log.d(TAG, "recomputeGear: location="
+                + (loc != null ? loc.getName() : "null")
+                + " lat=" + (loc != null ? loc.getLatitude() : null)
+                + " lon=" + (loc != null ? loc.getLongitude() : null));
+
         gearLiveData.setValue(outfit);
     }
 
     /**
-     * v1 implementation:
-     *  - We simply return response.current as the representative weather.
+     * Derive representative "hunt window" weather using high/low extremes:
+     *  - lowest & highest apparent + actual temp in the window
+     *  - lowest & highest wind speed in the window
+     *  - total precip/snow over the window
+     *  - barometric pressure from hourly surface_pressure
      *
-     * v2:
-     *  - Use hourly forecast to compute:
-     *      - min/max apparent temp
-     *      - max wind
-     *      - total precip
-     *    across the selected HuntWindow for the selected day.
+     * For gear scoring we use:
+     *  - lowest apparent temp (coldest point),
+     *  - highest wind speed (worst wind),
+     *  - total precip & snow (overall wetness),
+     *  - average barometric pressure (for display / trend).
      */
     private CurrentWeather deriveWindowWeather(WeatherResponse response, HuntWindow window) {
         if (response == null || response.current == null) {
@@ -214,7 +218,7 @@ public class HomeViewModel extends ViewModel {
             return response.current;
         }
 
-        // Build TimeZone from response.timezone, fallback to device default
+        // TimeZone from API, fallback to device default
         TimeZone tz;
         if (response.timezone != null && !response.timezone.isEmpty()) {
             tz = TimeZone.getTimeZone(response.timezone);
@@ -222,12 +226,12 @@ public class HomeViewModel extends ViewModel {
             tz = TimeZone.getDefault();
         }
 
-        // Parse sunrise / sunset strings (we use the first day for now)
+        // Use first day's sunrise/sunset for now
         String sunriseStr = daily.sunrise.get(0);
         String sunsetStr = daily.sunset.get(0);
 
-        // OpenMeteo "local time" is usually like "2025-12-06T07:14"
-        SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US);
+        SimpleDateFormat dateTimeFormat =
+                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US);
         dateTimeFormat.setTimeZone(tz);
 
         Date sunriseDate;
@@ -240,20 +244,20 @@ public class HomeViewModel extends ViewModel {
             return response.current;
         }
 
-        // Build Calendar instances for sunrise & sunset
+        // Build Calendar instances
         Calendar sunriseCal = Calendar.getInstance(tz);
         sunriseCal.setTime(sunriseDate);
 
         Calendar sunsetCal = Calendar.getInstance(tz);
         sunsetCal.setTime(sunsetDate);
 
-        // Define hunt window boundaries: 2h before sunrise / 2h after sunset, etc.
+        // Define hunt window boundaries using +/- 2h around sunrise/sunset
         Calendar windowStartCal = Calendar.getInstance(tz);
         Calendar windowEndCal = Calendar.getInstance(tz);
 
         switch (window) {
             case MORNING_MID:
-                // 2 hours before sunrise through ~4 hours after sunrise
+                // 2h before sunrise through ~4h after sunrise
                 windowStartCal.setTime(sunriseDate);
                 windowStartCal.add(Calendar.HOUR_OF_DAY, -2);
 
@@ -262,7 +266,7 @@ public class HomeViewModel extends ViewModel {
                 break;
 
             case MID_EVENING:
-                // Late morning (4h after sunrise) through 2 hours after sunset
+                // Late morning (4h after sunrise) through 2h after sunset
                 windowStartCal.setTime(sunriseDate);
                 windowStartCal.add(Calendar.HOUR_OF_DAY, 4);
 
@@ -272,7 +276,7 @@ public class HomeViewModel extends ViewModel {
 
             case ALL_DAY:
             default:
-                // From 2 hours before sunrise through 2 hours after sunset
+                // 2h before sunrise through 2h after sunset
                 windowStartCal.setTime(sunriseDate);
                 windowStartCal.add(Calendar.HOUR_OF_DAY, -2);
 
@@ -291,18 +295,39 @@ public class HomeViewModel extends ViewModel {
         // Shortcuts to hourly arrays
         List<String> times = hourly.time;
         List<Double> temps = hourly.temperature2m;
-        List<Double> apparentTemps = (hourly.apparentTemperature != null && !hourly.apparentTemperature.isEmpty())
+        List<Double> apparentTemps = (hourly.apparentTemperature != null &&
+                !hourly.apparentTemperature.isEmpty())
                 ? hourly.apparentTemperature
                 : hourly.temperature2m;
         List<Double> winds = hourly.windSpeed10m;
         List<Double> precips = hourly.precipitation;
         List<Double> snows = hourly.snowfall;
+        List<Double> baros = hourly.barometricPressure; // surface_pressure
 
-        double sumTemp = 0.0;
-        double sumApparent = 0.0;
-        double maxWind = 0.0;
+        // High/low trackers
+        double minTemp = Double.POSITIVE_INFINITY;
+        double maxTemp = Double.NEGATIVE_INFINITY;
+
+        double minApparent = Double.POSITIVE_INFINITY;
+        double maxApparent = Double.NEGATIVE_INFINITY;
+
+        double minWind = Double.POSITIVE_INFINITY;
+        double maxWind = Double.NEGATIVE_INFINITY;
+
+        double minPrecip = Double.POSITIVE_INFINITY;
+        double maxPrecip = Double.NEGATIVE_INFINITY;
+
+        double minSnow = Double.POSITIVE_INFINITY;
+        double maxSnow = Double.NEGATIVE_INFINITY;
+
+        double minBaro = Double.POSITIVE_INFINITY;
+        double maxBaro = Double.NEGATIVE_INFINITY;
+        double sumBaro = 0.0;
+        int baroCount = 0;
+
         double totalPrecip = 0.0;
         double totalSnow = 0.0;
+
         int count = 0;
 
         for (int i = 0; i < times.size(); i++) {
@@ -327,51 +352,92 @@ public class HomeViewModel extends ViewModel {
             double w = safeGet(winds, i, response.current.windSpeed10m);
             double p = safeGet(precips, i, 0.0);
             double s = safeGet(snows, i, 0.0);
+            double b = (baros != null && !baros.isEmpty())
+                    ? safeGet(baros, i, response.current.barometricPressure)
+                    : response.current.barometricPressure;
 
-            sumTemp += t;
-            sumApparent += a;
+            // Update min/max
+            if (t < minTemp) minTemp = t;
+            if (t > maxTemp) maxTemp = t;
+
+            if (a < minApparent) minApparent = a;
+            if (a > maxApparent) maxApparent = a;
+
+            if (w < minWind) minWind = w;
+            if (w > maxWind) maxWind = w;
+
+            if (p < minPrecip) minPrecip = p;
+            if (p > maxPrecip) maxPrecip = p;
+
+            if (s < minSnow) minSnow = s;
+            if (s > maxSnow) maxSnow = s;
+
+            if (!Double.isNaN(b)) {
+                if (b < minBaro) minBaro = b;
+                if (b > maxBaro) maxBaro = b;
+                sumBaro += b;
+                baroCount++;
+            }
+
             totalPrecip += p;
             totalSnow += s;
-            if (w > maxWind) maxWind = w;
 
             count++;
         }
 
-        if (count == 0) {
+        if (count == 0 || Double.isInfinite(minApparent)) {
             Log.w(TAG, "deriveWindowWeather: no hourly points matched window=" + window
                     + ", falling back to current");
             return response.current;
         }
 
-        double avgTemp = sumTemp / count;
-        double avgApparent = sumApparent / count;
+        double avgBaro;
+        if (baroCount > 0) {
+            avgBaro = sumBaro / baroCount;
+        } else {
+            avgBaro = response.current.barometricPressure;
+            minBaro = avgBaro;
+            maxBaro = avgBaro;
+        }
+
+        // Use "worst-case" for main gear inputs
+        double chosenTemp = minTemp;
+        double chosenApparent = minApparent;
+        double chosenWind = maxWind;
 
         CurrentWeather base = response.current;
         CurrentWeather windowWeather = new CurrentWeather();
 
-        // Temps
-        windowWeather.temperature2m = avgTemp;
-        windowWeather.apparentTemperature = avgApparent;
+        windowWeather.temperature2m = chosenTemp;
+        windowWeather.apparentTemperature = chosenApparent;
 
-        // Wind: worst-case gustiness in the hunting window
-        windowWeather.windSpeed10m = maxWind;
-        windowWeather.windDirection10m = base.windDirection10m; // reuse direction for now
+        windowWeather.windSpeed10m = chosenWind;
+        windowWeather.windDirection10m = base.windDirection10m;
 
-        // Precip/snow totals across the window
         windowWeather.precipitation = totalPrecip;
         windowWeather.snowfall = totalSnow;
 
+        // Barometric pressure (surface_pressure) aggregated over window
+        windowWeather.barometricPressure = avgBaro;
+
         // Copy less-volatile fields from current
-        windowWeather.pressureMsl = base.pressureMsl;
         windowWeather.relativeHumidity = base.relativeHumidity;
         windowWeather.cloudCover = base.cloudCover;
 
         Log.d(TAG, "deriveWindowWeather: window=" + window
-                + " avgApparent=" + avgApparent
-                + "F, avgTemp=" + avgTemp
-                + "F, maxWind=" + maxWind
+                + " minApparent=" + minApparent
+                + "F, maxApparent=" + maxApparent
+                + "F, minTemp=" + minTemp
+                + "F, maxTemp=" + maxTemp
+                + "F, minWind=" + minWind
+                + " mph, maxWind=" + maxWind
                 + " mph, totalPrecip=" + totalPrecip
-                + " in, totalSnow=" + totalSnow + " in");
+                + " in (maxHourly=" + maxPrecip
+                + "), totalSnow=" + totalSnow
+                + " in (maxHourly=" + maxSnow
+                + "), baroAvg=" + avgBaro
+                + " (min=" + minBaro
+                + ", max=" + maxBaro + ")");
 
         return windowWeather;
     }

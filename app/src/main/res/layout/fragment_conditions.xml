@@ -1,14 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/conditions_root"
+    android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.conditions.ConditionsFragment">
+    android:fitsSystemWindows="true"
+    android:padding="16dp"
+    android:background="#FF000000"> <!-- solid black background for visibility -->
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <!-- Location selection -->
+    <Spinner
+        android:id="@+id/spinner_location_conditions"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:layout_height="wrap_content"
+        android:background="#40FFFFFF" />
 
-</FrameLayout>
+    <!-- 7-day forecast row -->
+    <TextView
+        android:id="@+id/text_conditions_forecast_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="7-Day Forecast"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp"
+        android:textColor="@android:color/white" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_conditions_forecast"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="4dp"
+        android:clipToPadding="false"
+        android:padding="4dp"
+        android:background="#40FFFFFF" /> <!-- translucent light panel behind the 7-day items -->
+
+    <!-- Charts title -->
+    <TextView
+        android:id="@+id/text_conditions_chart_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hourly for selected day"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:textColor="@android:color/white" />
+
+    <!-- Temperature chart -->
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/chart_temp"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginTop="8dp"
+        android:background="#20FFFFFF" /> <!-- faint panel so axis labels are visible -->
+
+    <!-- Wind chart -->
+    <com.github.mikephil.charting.charts.LineChart
+        android:id="@+id/chart_wind"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginTop="8dp"
+        android:background="#20FFFFFF" />
+
+    <!-- Precip chart -->
+    <com.github.mikephil.charting.charts.BarChart
+        android:id="@+id/chart_precip"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginTop="8dp"
+        android:background="#20FFFFFF" />
+
+</LinearLayout>

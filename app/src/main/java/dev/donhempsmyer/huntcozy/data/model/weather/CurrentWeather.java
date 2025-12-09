@@ -25,8 +25,8 @@ public class CurrentWeather {
     @SerializedName("wind_direction_10m")
     public double windDirection10m;
 
-    @SerializedName("pressure_msl")
-    public double pressureMsl;
+    @SerializedName("surface_pressure")
+    public double barometricPressure;
 
     @SerializedName("relative_humidity_2m")
     public double relativeHumidity;

@@ -20,6 +20,7 @@ public interface WeatherApiService {
             @Query("forecast_days") int forecastDays,
             @Query("temperature_unit") String temperatureUnit,
             @Query("wind_speed_unit") String windSpeedUnit,
+            @Query("pressure_unit") String pressureUnit,
             @Query("precipitation_unit") String precipitationUnit,
             @Query("snowfall_unit") String snowfallUnit
     );

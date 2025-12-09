@@ -1,14 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/locations_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".ui.locations.LocationsFragment">
+    android:layout_height="match_parent">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <!-- Main content -->
+    <LinearLayout
+        android:id="@+id/layout_locations_content"
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:padding="16dp">
 
-</FrameLayout>
+        <TextView
+            android:id="@+id/text_locations_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="My Locations"
+            android:textStyle="bold"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/text_locations_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Saved stands, blinds, and access points."
+            android:textSize="14sp"
+            android:alpha="0.8" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_locations"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:paddingBottom="108dp"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/text_empty_locations"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No locations yet."
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Fab for adding new location (future: open AddLocation dialog) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_location"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:contentDescription="Add location"
+        app:srcCompat="@drawable/ic_add"
+        app:layout_anchor="@id/layout_locations_content"
+        app:layout_anchorGravity="bottom|end" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

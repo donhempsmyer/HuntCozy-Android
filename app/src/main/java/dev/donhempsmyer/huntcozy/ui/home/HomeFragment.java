@@ -1,11 +1,11 @@
 package dev.donhempsmyer.huntcozy.ui.home;
 
-
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
@@ -18,25 +18,22 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import dev.donhempsmyer.huntcozy.R;
 import dev.donhempsmyer.huntcozy.data.model.GearItem;
 import dev.donhempsmyer.huntcozy.data.model.HuntingStyle;
-import dev.donhempsmyer.huntcozy.data.model.LocationModel;
 import dev.donhempsmyer.huntcozy.data.model.WeaponType;
+import dev.donhempsmyer.huntcozy.data.model.HuntWindow;
+import dev.donhempsmyer.huntcozy.data.model.location.HuntLocation;
 import dev.donhempsmyer.huntcozy.data.model.weather.DailyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.HourlyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.WeatherResponse;
 import dev.donhempsmyer.huntcozy.ui.packing.PackingListFragment;
-import dev.donhempsmyer.huntcozy.data.model.HuntWindow;
-
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.button.MaterialButtonToggleGroup;
-
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 
 public class HomeFragment extends Fragment {
 
@@ -48,25 +45,33 @@ public class HomeFragment extends Fragment {
 
     private HomeViewModel viewModel;
 
+    // Header / selectors
     private TextView textLocationName;
     private TextView textCurrentTemp;
     private TextView textCurrentWind;
     private TextView textCurrentPrecip;
+
     private Spinner spinnerLocation;
     private Spinner spinnerWeapon;
     private Spinner spinnerHuntingStyle;
-    private RecyclerView recyclerForecast;
-    private RecyclerView recyclerGear;
-    private TextView textForecastTitle;
-    private Button buttonBackToDaily;private MaterialButtonToggleGroup groupHuntWindow;
+
+    private MaterialButtonToggleGroup groupHuntWindow;
     private MaterialButton btnMorningMid;
     private MaterialButton btnMidEvening;
     private MaterialButton btnAllDay;
 
-
+    // Forecast + gear
+    private RecyclerView recyclerForecast;
+    private RecyclerView recyclerGear;
+    private TextView textForecastTitle;
+    private Button buttonBackToDaily;
 
     private ForecastAdapter forecastAdapter;
     private GearAdapter gearAdapter;
+
+    // Location spinner backing data
+    private ArrayAdapter<String> locationAdapter;
+    private final List<HuntLocation> locationItems = new ArrayList<>();
 
     // Keep last weather response for toggling daily/hourly
     private WeatherResponse lastWeather;
@@ -104,9 +109,11 @@ public class HomeFragment extends Fragment {
         textCurrentTemp = root.findViewById(R.id.text_current_temp);
         textCurrentWind = root.findViewById(R.id.text_current_wind);
         textCurrentPrecip = root.findViewById(R.id.text_current_precip);
+
         spinnerLocation = root.findViewById(R.id.spinner_location);
         spinnerWeapon = root.findViewById(R.id.spinner_weapon);
         spinnerHuntingStyle = root.findViewById(R.id.spinner_hunting_style);
+
         recyclerForecast = root.findViewById(R.id.recycler_forecast);
         recyclerGear = root.findViewById(R.id.recycler_gear);
         textForecastTitle = root.findViewById(R.id.text_forecast_title);
@@ -120,33 +127,89 @@ public class HomeFragment extends Fragment {
         buttonBackToDaily.setOnClickListener(v -> showDailyForecast());
     }
 
+    /**
+     * Location spinner is driven by:
+     *  - locations list (names in dropdown)
+     *  - selectedLocation (for header + keeping spinner selection in sync)
+     */
     private void setupLocationSpinner() {
-        viewModel.getLocations().observe(getViewLifecycleOwner(), locations -> {
-            Log.d(TAG, "setupLocationSpinner: locations size=" + (locations != null ? locations.size() : 0));
-            if (locations == null) return;
+        // Adapter holds only the location names
+        locationAdapter = new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_spinner_item,
+                new ArrayList<>()
+        );
+        locationAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerLocation.setAdapter(locationAdapter);
 
-            ArrayAdapter<LocationModel> adapter = new ArrayAdapter<>(
-                    requireContext(),
-                    android.R.layout.simple_spinner_item,
-                    locations
-            );
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spinnerLocation.setAdapter(adapter);
-
-            LocationModel selected = viewModel.getSelectedLocation().getValue();
-            if (selected != null) {
-                int index = locations.indexOf(selected);
-                if (index >= 0) spinnerLocation.setSelection(index);
+        // User selection → ViewModel
+        spinnerLocation.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent,
+                                       View view,
+                                       int position,
+                                       long id) {
+                if (position < 0 || position >= locationItems.size()) return;
+                HuntLocation selected = locationItems.get(position);
+                viewModel.onLocationSelected(selected);
             }
 
-            spinnerLocation.setOnItemSelectedListener(new SimpleItemSelectedListener() {
-                @Override
-                public void onItemSelected(int position) {
-                    LocationModel loc = locations.get(position);
-                    viewModel.selectLocation(loc);
-                }
-            });
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // no-op
+            }
         });
+
+        // Locations list → update items + names
+        viewModel.getLocations().observe(getViewLifecycleOwner(), locations -> {
+            int count = (locations != null) ? locations.size() : 0;
+            Log.d(TAG, "setupLocationSpinner: locations size=" + count);
+
+            locationItems.clear();
+            locationAdapter.clear();
+
+            if (locations != null) {
+                locationItems.addAll(locations);
+                for (HuntLocation loc : locations) {
+                    locationAdapter.add(loc.getName());
+                }
+            }
+
+            locationAdapter.notifyDataSetChanged();
+            syncSpinnerWithSelectedLocation();
+        });
+
+        // Selected location → header text + keep spinner aligned
+        viewModel.getSelectedLocation().observe(getViewLifecycleOwner(), selected -> {
+            if (selected == null) {
+                textLocationName.setText("Selected Location");
+            } else {
+                textLocationName.setText("Location: " + selected.getName());
+            }
+            syncSpinnerWithSelectedLocation();
+        });
+    }
+
+    /**
+     * Ensures spinner selection matches ViewModel's selectedLocation,
+     * even when selection is changed outside of this Fragment (e.g. LocationsFragment).
+     */
+    private void syncSpinnerWithSelectedLocation() {
+        HuntLocation selected = viewModel.getSelectedLocation().getValue();
+        if (selected == null || locationItems.isEmpty()) return;
+
+        int index = -1;
+        for (int i = 0; i < locationItems.size(); i++) {
+            if (locationItems.get(i).getId() == selected.getId()) {
+                index = i;
+                break;
+            }
+        }
+
+        if (index >= 0 && spinnerLocation.getSelectedItemPosition() != index) {
+            Log.d(TAG, "syncSpinnerWithSelectedLocation: setting position=" + index);
+            spinnerLocation.setSelection(index);
+        }
     }
 
     private void setupWeaponSpinner() {
@@ -227,7 +290,7 @@ public class HomeFragment extends Fragment {
             viewModel.setHuntWindow(window);
         });
 
-        // Optional: observe changes from the ViewModel to keep UI in sync
+        // Keep toggle in sync with ViewModel (e.g. if HuntWindow is changed elsewhere)
         viewModel.getHuntWindow().observe(getViewLifecycleOwner(), window -> {
             if (window == null) return;
             int id;
@@ -269,9 +332,12 @@ public class HomeFragment extends Fragment {
     private void updateCurrentWeatherUI(WeatherResponse response) {
         if (response == null || response.current == null) return;
 
-        textLocationName.setText(viewModel.getSelectedLocation().getValue() != null
-                ? viewModel.getSelectedLocation().getValue().getName()
-                : "Selected Location");
+        HuntLocation selected = viewModel.getSelectedLocation().getValue();
+        if (selected != null) {
+            textLocationName.setText("Location: " + selected.getName());
+        } else {
+            textLocationName.setText("Selected Location");
+        }
 
         String tempText = String.format("%.0f°F (Feels %.0f°F)",
                 response.current.temperature2m,
@@ -283,10 +349,15 @@ public class HomeFragment extends Fragment {
                 response.current.windDirection10m);
         textCurrentWind.setText(windText);
 
-        String precipText = String.format("Precip %.2f in · Snow %.2f in · Pressure %.0f hPa",
+        double baroHpa = response.current.barometricPressure;
+        double baroInHg = baroHpa * 0.02953;
+
+        String precipText = String.format(
+                "Precip %.2f in · Snow %.2f in · Pressure %.0f inHg",
                 response.current.precipitation,
                 response.current.snowfall,
-                response.current.pressureMsl);
+                baroInHg
+        );
         textCurrentPrecip.setText(precipText);
     }
 
@@ -305,7 +376,7 @@ public class HomeFragment extends Fragment {
 
         for (int i = 0; i < d.time.size(); i++) {
             String isoDate = d.time.get(i); // "2025-12-02"
-            String dayLabel = isoDate; // TODO: prettify using LocalDate short day-of-week
+            String dayLabel = isoDate;      // TODO: prettify
             labels.add(dayLabel);
 
             double tMin = d.temperatureMin.get(i);
@@ -344,7 +415,6 @@ public class HomeFragment extends Fragment {
         List<String> values = new ArrayList<>();
         List<String> markers = new ArrayList<>();
 
-        // Find indices in hourly.time that match this date
         for (int i = 0; i < h.time.size(); i++) {
             String iso = h.time.get(i); // "2025-12-02T07:00"
             if (!iso.startsWith(dayDate)) continue;
@@ -355,7 +425,6 @@ public class HomeFragment extends Fragment {
             double temp = h.temperature2m.get(i);
             values.add(String.format("%.0f°", temp));
 
-            // Marker: sunrise/sunset/hi/low (basic v1)
             String marker = "";
             String sunrise = d.sunrise.get(dayIndex);
             String sunset = d.sunset.get(dayIndex);
@@ -368,7 +437,7 @@ public class HomeFragment extends Fragment {
             markers.add(marker);
         }
 
-        // TODO: In v2, compute actual time-of-day for hi/lo temp within this day
+        // TODO: In v2, compute hi/lo temp times of day
         forecastAdapter.setData(labels, values, markers);
     }
 
@@ -382,7 +451,6 @@ public class HomeFragment extends Fragment {
     private void navigateToPackingList(GearItem item) {
         Log.d(TAG, "navigateToPackingList: clicked gear " + item.getName());
 
-        // For now just navigate to PackingListFragment (no arguments).
         requireActivity().getSupportFragmentManager()
                 .beginTransaction()
                 .replace(R.id.main_fragment_container, PackingListFragment.newInstance())
@@ -390,14 +458,21 @@ public class HomeFragment extends Fragment {
                 .commit();
     }
 
-    // Simple helper class to avoid boilerplate in spinner listeners
-    private abstract static class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {
+    /**
+     * Simple helper class to avoid boilerplate in spinner listeners
+     * for WeaponType / HuntingStyle only.
+     */
+    private abstract static class SimpleItemSelectedListener
+            implements android.widget.AdapterView.OnItemSelectedListener {
+
         @Override
         public void onNothingSelected(android.widget.AdapterView<?> parent) { }
 
         @Override
-        public void onItemSelected(android.widget.AdapterView<?> parent, View view,
-                                   int position, long id) {
+        public void onItemSelected(android.widget.AdapterView<?> parent,
+                                   View view,
+                                   int position,
+                                   long id) {
             onItemSelected(position);
         }
 
@@ -405,6 +480,6 @@ public class HomeFragment extends Fragment {
     }
 
     // Alternate approach:
-    // - Put all this binding logic into a separate HomeUiController class and keep Fragment thinner.
-    // - Use Data Binding / View Binding to avoid findViewById.
+    // - Extract the UI wiring into a HomeUiController to keep Fragment thinner.
+    // - Use View Binding / Data Binding to avoid findViewById.
 }

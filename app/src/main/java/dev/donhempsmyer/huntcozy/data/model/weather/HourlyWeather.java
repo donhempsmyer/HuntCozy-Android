@@ -30,6 +30,6 @@ public class HourlyWeather {
     @SerializedName("wind_direction_10m")
     public List<Double> windDirection10m;
 
-    @SerializedName("pressure_msl")
-    public List<Double> pressureMsl;
+    @SerializedName("surface_pressure")
+    public List<Double> barometricPressure;
 }
