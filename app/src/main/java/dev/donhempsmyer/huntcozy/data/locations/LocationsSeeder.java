@@ -44,6 +44,15 @@ public final class LocationsSeeder {
                 -67.520000
         ));
 
+        //example 4
+        list.add(new HuntLocation(
+                4L,
+                "Navarino",
+                44.38,
+                88.290000
+        ));
+
+
         return list;
     }
 

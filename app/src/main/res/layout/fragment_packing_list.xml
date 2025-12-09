@@ -1,14 +1,103 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/packing_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.packing.PackingListFragment">
+    >
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <!-- Dark overlay so it fits your forest theme if there's a BG behind -->
+    <LinearLayout
+        android:id="@+id/packing_content"
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:padding="16dp"
+        android:background="#80000000">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingTop="36dp"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- STAGED CLOTHING (from recommender) -->
+                <TextView
+                    android:id="@+id/text_packing_staged_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Staged Clothing (from Recommender)"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_packing_staged"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_marginTop="8dp"
+                    android:background="#30FFFFFF"
+                    android:padding="4dp"
+                    android:clipToPadding="false" />
+
+                <!-- LOADOUT (non-clothing gear) -->
+                <TextView
+                    android:id="@+id/text_packing_loadout_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Loadout (non-clothing)"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
+
+                <!-- Future: saved loadout selector -->
+                <!--
+                <Spinner
+                    android:id="@+id/spinner_packing_loadout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"/>
+                -->
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_packing_loadout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_marginTop="8dp"
+                    android:background="#30FFFFFF"
+                    android:padding="4dp"
+                    android:clipToPadding="false" />
+
+                <!-- PACKED ITEMS -->
+                <TextView
+                    android:id="@+id/text_packing_packed_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Packed"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_packing_packed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_marginTop="8dp"
+                    android:background="#30FFFFFF"
+                    android:padding="4dp"
+                    android:clipToPadding="false" />
+
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
 
 </FrameLayout>
