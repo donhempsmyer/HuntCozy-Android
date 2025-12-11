@@ -99,17 +99,17 @@ public class PackingListAdapter extends RecyclerView.Adapter<PackingListAdapter.
         void bind(PackingItem item) {
             label.setText(item.getLabel());
 
-            // 🔥 1) Remove listener before changing checked state
+            // 1) Remove listener before changing checked state
             checkBox.setOnCheckedChangeListener(null);
 
-            // 🔥 2) Set correct state based on mode
+            // 2) Set correct state based on mode
             boolean isChecked = (mode == Mode.PACKED);
             checkBox.setChecked(isChecked);
 
             // Optional: ensure visual state is applied immediately
             checkBox.jumpDrawablesToCurrentState();
 
-            // 🔥 3) Reattach listener
+            // 3) Reattach listener
             checkBox.setOnCheckedChangeListener((buttonView, checked) -> {
                 if (checkedListener != null) {
                     checkedListener.onItemChecked(item, checked);

@@ -13,11 +13,21 @@ public class PackingItem {
     private final String label;     // display name
     @Nullable
     private final GearItem gearItem; // null for generic items
+    private Source source;
 
-    public PackingItem(String id, String label, @Nullable GearItem gearItem) {
+    public enum Source {
+        STAGED,
+        WEAPON,
+        STYLE,
+        EVERY_HUNT,
+        OPTIONAL
+    }
+
+    public PackingItem(String id, String label, @Nullable GearItem gearItem, Source source) {
         this.id = id;
         this.label = label;
         this.gearItem = gearItem;
+        this.source = source;
     }
 
     public String getId() {
@@ -31,6 +41,14 @@ public class PackingItem {
     @Nullable
     public GearItem getGearItem() {
         return gearItem;
+    }
+
+    public Source getSource() {
+        return source;
+    }
+
+    public void setSource(Source source) {
+        this.source = source;
     }
 
     @Override

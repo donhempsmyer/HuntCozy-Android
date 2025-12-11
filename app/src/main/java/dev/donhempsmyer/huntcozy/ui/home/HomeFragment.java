@@ -34,6 +34,7 @@ import dev.donhempsmyer.huntcozy.data.model.weather.DailyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.HourlyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.WeatherResponse;
 import dev.donhempsmyer.huntcozy.ui.packing.PackingListFragment;
+import dev.donhempsmyer.huntcozy.ui.packing.PackingListViewModel;
 
 public class HomeFragment extends Fragment {
 
@@ -451,12 +452,22 @@ public class HomeFragment extends Fragment {
     private void navigateToPackingList(GearItem item) {
         Log.d(TAG, "navigateToPackingList: clicked gear " + item.getName());
 
+        PackingListViewModel packingVM =
+                new ViewModelProvider(requireActivity()).get(PackingListViewModel.class);
+
+        packingVM.setContextFromHome(
+                viewModel.getWeaponType().getValue(),
+                viewModel.getHuntingStyle().getValue()
+        );
+
         requireActivity().getSupportFragmentManager()
                 .beginTransaction()
                 .replace(R.id.main_fragment_container, PackingListFragment.newInstance())
                 .addToBackStack(null)
                 .commit();
     }
+
+
 
     /**
      * Simple helper class to avoid boilerplate in spinner listeners

@@ -46,34 +46,174 @@
                     android:clipToPadding="false" />
 
                 <!-- LOADOUT (non-clothing gear) -->
+                <!-- ==================== LOADOUT SECTIONS ==================== -->
+
                 <TextView
-                    android:id="@+id/text_packing_loadout_title"
+                    android:id="@+id/text_packing_weapon_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Loadout (non-clothing)"
+                    android:text="Weapon Loadout"
                     android:textStyle="bold"
                     android:textColor="@android:color/white"
                     android:textSize="16sp" />
 
-                <!-- Future: saved loadout selector -->
-                <!--
-                <Spinner
-                    android:id="@+id/spinner_packing_loadout"
+                <LinearLayout
+                    android:id="@+id/layout_packing_weapon_header"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"/>
-                -->
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/text_packing_weapon_subtitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="(Rifle)"
+                        android:textColor="@android:color/white"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/button_packing_edit_weapon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Edit" />
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recycler_packing_loadout"
+                    android:id="@+id/recycler_packing_weapon"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:background="#30FFFFFF"
                     android:padding="4dp"
-                    android:clipToPadding="false" />
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
+
+
+                <TextView
+                    android:id="@+id/text_packing_style_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Hunting-Style Loadout"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
+
+                <LinearLayout
+                    android:id="@+id/layout_packing_style_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/text_packing_style_subtitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="(Treestand)"
+                        android:textColor="@android:color/white"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/button_packing_edit_style"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Edit" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_packing_style"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="#30FFFFFF"
+                    android:padding="4dp"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
+
+
+                <TextView
+                    android:id="@+id/text_packing_every_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Every-Hunt Items"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
+
+                <LinearLayout
+                    android:id="@+id/layout_packing_every_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
+                    <Button
+                        android:id="@+id/button_packing_edit_every"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Edit" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_packing_every"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="#30FFFFFF"
+                    android:padding="4dp"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
+
+
+                <TextView
+                    android:id="@+id/text_packing_optional_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Optional Items"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp" />
+
+                <LinearLayout
+                    android:id="@+id/layout_packing_optional_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
+                    <Button
+                        android:id="@+id/button_packing_edit_optional"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Edit" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_packing_optional"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:background="#30FFFFFF"
+                    android:padding="4dp"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
 
                 <!-- PACKED ITEMS -->
                 <TextView
@@ -81,20 +221,39 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Packed"
+                    android:text="Packed Items"
                     android:textStyle="bold"
                     android:textColor="@android:color/white"
                     android:textSize="16sp" />
+
+                <LinearLayout
+                    android:id="@+id/layout_packing_packed_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
+                    <Button
+                        android:id="@+id/button_packing_unpack_all"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Unpack All" />
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recycler_packing_packed"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:background="#30FFFFFF"
                     android:padding="4dp"
-                    android:clipToPadding="false" />
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
 
             </LinearLayout>
         </ScrollView>
