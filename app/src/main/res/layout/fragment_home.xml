@@ -13,179 +13,326 @@
         android:scaleType="centerCrop"
         android:src="@drawable/bg_winter_forest_dark" />
 
-    <!-- Image by <a href="https://pixabay.com/users/ssidde-19562401/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=5864063">SSidde</a>
-     from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=5864063">Pixabay</a> -->
-
-    <!-- Translucent overlay content -->
-    <LinearLayout
-        android:id="@+id/home_content"
-        android:orientation="vertical"
+    <!-- Fullscreen translucent black scrim -->
+    <View
+        android:id="@+id/home_scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="16dp"
-        android:gravity="top"
-        android:background="#80000000"> <!-- semi-transparent black -->
+        android:background="#CC000000" />
+    <!-- Image by <a href="https://pixabay.com/users/ssidde-19562401/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=5864063">SSidde</a>
+   from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=5864063">Pixabay</a> -->
 
-        <!-- Top: Current weather for selected location -->
+
+    <!-- Dark overlay to improve contrast -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingTop="24dp">
+
         <LinearLayout
-            android:id="@+id/layout_current_weather"
+            android:id="@+id/home_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
             android:orientation="vertical"
-            android:padding="12dp"
-            android:background="#40FFFFFF"> <!-- translucent white -->
+            android:padding="16dp">
 
-            <TextView
-                android:id="@+id/text_location_name"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="North Ridge Stand"
-                android:textStyle="bold"
-                android:textSize="18sp"
-                android:textColor="@android:color/white" />
-
-            <TextView
-                android:id="@+id/text_current_temp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="-5°C (Feels -10°C)"
-                android:textColor="@android:color/white" />
-
-            <TextView
-                android:id="@+id/text_current_wind"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Wind 15 km/h NW"
-                android:textColor="@android:color/white" />
-
-            <TextView
-                android:id="@+id/text_current_precip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Light snow · Pressure 1012 hPa"
-                android:textColor="@android:color/white" />
-        </LinearLayout>
-
-        <!-- Location dropdown -->
-        <Spinner
-            android:id="@+id/spinner_location"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="#40FFFFFF" />
-
-        <!-- Forecast section (7-day or hourly) -->
-        <LinearLayout
-            android:id="@+id/layout_forecast_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="12dp"
-            android:background="#40FFFFFF">
-
-            <LinearLayout
+            <!-- CURRENT WEATHER CARD -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_current_weather"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="8dp">
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp">
 
-                <TextView
-                    android:id="@+id/text_forecast_title"
+                <LinearLayout
+                    android:id="@+id/layout_current_weather"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/text_location_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="North Ridge Stand"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/text_current_temp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="-5°F (Feels -10°F)"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/text_current_wind"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Wind 15 mph NW"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/text_current_precip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Precip 0.00 in · Snow 0.0 in · Pressure 29.80 inHg"
+                        android:textColor="@android:color/white" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- LOCATION SELECTOR CARD -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_location_selector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/text_location_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Hunt Location"
+                        android:textColor="@android:color/white"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spinner_location"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="#ABFFFFFF"
+                        android:padding="4dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- FORECAST CARD (7-day or hourly) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/layout_forecast_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="8dp">
+
+                        <TextView
+                            android:id="@+id/text_forecast_title"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="7-Day Forecast"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/button_back_to_daily"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Back"
+                            android:textAllCaps="false"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recycler_forecast"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="110dp"
+                        android:clipToPadding="false"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:paddingBottom="8dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- HUNT WINDOW TOGGLE -->
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/group_hunt_window"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_window_morning_mid"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="7-Day Forecast"
-                    android:textColor="@android:color/white"
-                    android:textStyle="bold" />
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="6dp"
+                    android:text="Morning–Mid"
+                    android:textSize="12sp"
+                    app:backgroundTint="@color/hunt_window_bg_selector"
+                    android:textColor="@color/hunt_window_text_selector"
+                    app:strokeColor="@color/hunt_window_stroke_selector"
+                    app:strokeWidth="1dp"/>
 
-                <Button
-                    android:id="@+id/button_back_to_daily"
-                    android:layout_width="wrap_content"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_window_mid_evening"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Back"
-                    android:visibility="gone" />
-            </LinearLayout>
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="6dp"
+                    android:text="Mid–Evening"
+                    android:textSize="12sp"
+                    app:backgroundTint="@color/hunt_window_bg_selector"
+                    android:textColor="@color/hunt_window_text_selector"
+                    app:strokeColor="@color/hunt_window_stroke_selector"
+                    app:strokeWidth="1dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_window_all_day"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="6dp"
+                    android:text="All-Day"
+                    android:textSize="12sp"
+                    app:backgroundTint="@color/hunt_window_bg_selector"
+                    android:textColor="@color/hunt_window_text_selector"
+                    app:strokeColor="@color/hunt_window_stroke_selector"
+                    app:strokeWidth="1dp"/>
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <!-- WEAPON + HUNTING STYLE CARD -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/layout_selectors"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Weapon"
+                                android:textColor="@android:color/white"
+                                android:textSize="12sp" />
+
+                            <Spinner
+                                android:id="@+id/spinner_weapon"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:background="#ABFFFFFF"
+                                android:padding="4dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Hunting Style"
+                                android:textColor="@android:color/white"
+                                android:textSize="12sp" />
+
+                            <Spinner
+                                android:id="@+id/spinner_hunting_style"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:background="#ABFFFFFF"
+                                android:padding="4dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- RECOMMENDED GEAR HEADER + LIST -->
+            <TextView
+                android:id="@+id/text_recommended_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="Recommended Outfit"
+                android:textColor="@android:color/white"
+                android:textStyle="bold" />
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recycler_forecast"
+                android:id="@+id/recycler_gear"
                 android:layout_width="match_parent"
-                android:layout_height="100dp"
-                android:padding="4dp"
-                android:clipToPadding="false" />
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="#33FFFFFF"
+                android:clipToPadding="false"
+                android:padding="4dp" />
+
         </LinearLayout>
-
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/group_hunt_window"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:singleSelection="true"
-            app:selectionRequired="true">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_window_morning_mid"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Morning–Mid"
-                android:textColor="@color/white"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_window_mid_evening"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Mid–Evening"
-                android:textColor="@color/white"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_window_all_day"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="All-Day"
-                android:textColor="@color/white"/>
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <!-- Weapon + Hunting style selection -->
-        <LinearLayout
-            android:id="@+id/layout_selectors"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="12dp"
-            android:background="#40FFFFFF"
-            android:padding="8dp">
-
-            <Spinner
-                android:id="@+id/spinner_weapon"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1" />
-
-            <Spinner
-                android:id="@+id/spinner_hunting_style"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp" />
-        </LinearLayout>
-
-        <!-- Recommended gear list (clickable -> Packing List) -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_gear"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="12dp"
-            android:background="#40FFFFFF"
-            android:clipToPadding="false"
-            android:padding="4dp"/>
-
-    </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 
 </FrameLayout>

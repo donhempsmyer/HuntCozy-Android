@@ -89,8 +89,15 @@ public class OpenMeteoWeatherRepository implements WeatherRepository {
             public void onResponse(Call<WeatherResponse> call,
                                    Response<WeatherResponse> response) {
                 if (response.isSuccessful()) {
-                    Log.d(TAG, "onResponse: success");
-                    weatherLiveData.postValue(response.body());
+                    WeatherResponse body = response.body();
+                    if (body != null) {
+                        Log.d(TAG, "onResponse: success, api timezone=" + body.timezone);
+                        if (body.daily != null && body.daily.sunrise != null
+                                && !body.daily.sunrise.isEmpty()) {
+                            Log.d(TAG, "onResponse: first sunrise=" + body.daily.sunrise.get(0));
+                        }
+                    }
+                    weatherLiveData.postValue(body);
                 } else {
                     Log.w(TAG, "onResponse: HTTP error code=" + response.code());
                 }

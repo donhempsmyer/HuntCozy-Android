@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Checked state: warm amber-ish highlight -->
+    <item
+        android:state_checked="true"
+        android:color="#CCFFB74D" />  <!-- semi-opaque amber -->
+
+    <!-- Default: subtle translucent white -->
+    <item android:color="#40FFFFFF" />
+</selector>

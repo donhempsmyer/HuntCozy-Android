@@ -52,6 +52,13 @@ public final class LocationsSeeder {
                 88.290000
         ));
 
+        list.add(new HuntLocation(
+                5L,
+                "Pensacola",
+                30.41,
+                -87.22
+        ));
+
 
         return list;
     }

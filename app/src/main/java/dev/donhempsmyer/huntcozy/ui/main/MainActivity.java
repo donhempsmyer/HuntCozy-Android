@@ -1,11 +1,12 @@
 package dev.donhempsmyer.huntcozy.ui.main;
 
-
 import android.os.Bundle;
 import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import dev.donhempsmyer.huntcozy.R;
 import dev.donhempsmyer.huntcozy.ui.closet.ClosetFragment;
@@ -13,7 +14,6 @@ import dev.donhempsmyer.huntcozy.ui.conditions.ConditionsFragment;
 import dev.donhempsmyer.huntcozy.ui.home.HomeFragment;
 import dev.donhempsmyer.huntcozy.ui.locations.LocationsFragment;
 import dev.donhempsmyer.huntcozy.ui.packing.PackingListFragment;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -28,19 +28,27 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         bottomNav = findViewById(R.id.bottom_nav);
+
+        // Centralized tab switching via bottom nav
         bottomNav.setOnItemSelectedListener(item -> {
-            Log.d(TAG, "onCreate: bottomNav item selected id=" + item.getItemId());
-            switchTo(item.getItemId());
+            int itemId = item.getItemId();
+            Log.d(TAG, "bottomNav item selected id=" + itemId);
+            switchTo(itemId);
             return true;
         });
 
         if (savedInstanceState == null) {
             Log.d(TAG, "onCreate: initial fragment = HomeFragment");
+            // This will BOTH select the tab AND trigger the listener above,
+            // which calls switchTo(R.id.nav_home)
             bottomNav.setSelectedItemId(R.id.nav_home);
-            switchTo(R.id.nav_home);
         }
     }
 
+    /**
+     * Replace the root fragment for the selected bottom-nav item.
+     * This is only called from the BottomNavigationView listener.
+     */
     private void switchTo(int itemId) {
         Fragment fragment;
 
@@ -65,6 +73,38 @@ public class MainActivity extends AppCompatActivity {
                 .beginTransaction()
                 .replace(R.id.main_fragment_container, fragment)
                 .commit();
+    }
+
+    // ---- Helpers for fragments to request a tab switch ----------------------
+
+    public void openHomeTab() {
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_home);
+        }
+    }
+
+    public void openLocationsTab() {
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_locations);
+        }
+    }
+
+    public void openConditionsTab() {
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_conditions);
+        }
+    }
+
+    public void openClosetTab() {
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_closet);
+        }
+    }
+
+    public void openPackingTab() {
+        if (bottomNav != null) {
+            bottomNav.setSelectedItemId(R.id.nav_packing_list);
+        }
     }
 
     // Alternate approach:

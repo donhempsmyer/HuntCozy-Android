@@ -1,29 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:layout_width="60dp"
-    android:layout_height="match_parent"
-    android:gravity="center"
-    android:padding="4dp">
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="3dp"
+    app:cardUseCompatPadding="true"
+    app:cardBackgroundColor="#33FFFFFF">
 
-    <TextView
-        android:id="@+id/text_hour_label"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="07:00"
-        android:textColor="@android:color/white" />
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:minWidth="96dp">
 
-    <TextView
-        android:id="@+id/text_hour_temp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="-7°"
-        android:textColor="@android:color/white" />
+        <!-- Label: e.g. "06:00" -->
+        <TextView
+            android:id="@+id/text_forecast_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="06:00"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
-    <TextView
-        android:id="@+id/text_hour_marker"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textColor="@android:color/white" />
-</LinearLayout>
+        <!-- Primary: "23° (Feels 18°)" -->
+        <TextView
+            android:id="@+id/text_forecast_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="23° (Feels 18°)"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- Secondary: "NW 7 mph · Precip 0.02 in" -->
+        <TextView
+            android:id="@+id/text_forecast_secondary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="NW 7 mph · Precip 0.02 in"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <!-- Marker: "Sunrise" / "Sunset" when present -->
+        <TextView
+            android:id="@+id/text_forecast_marker"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text=""
+            android:textColor="@android:color/white"
+            android:textSize="10sp" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

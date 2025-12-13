@@ -29,6 +29,7 @@ import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
@@ -73,6 +74,8 @@ public class ConditionsFragment extends Fragment {
     private LineChart chartTemp;
     private LineChart chartWind;
     private BarChart chartPrecip;
+    private LineChart chartPressure;
+    private android.widget.Button buttonBackToWeekly; // NEW
 
     private ForecastAdapter forecastAdapter;
     private ArrayAdapter<String> locationAdapter;
@@ -109,7 +112,6 @@ public class ConditionsFragment extends Fragment {
         if (passedId != -1) {
             selectLocationById(passedId);
         }
-
     }
 
     private void bindViews(View root) {
@@ -117,12 +119,25 @@ public class ConditionsFragment extends Fragment {
         textForecastTitle = root.findViewById(R.id.text_conditions_forecast_title);
         recyclerForecast = root.findViewById(R.id.recycler_conditions_forecast);
         textChartTitle = root.findViewById(R.id.text_conditions_chart_title);
+
         chartTemp = root.findViewById(R.id.chart_temp);
         chartWind = root.findViewById(R.id.chart_wind);
         chartPrecip = root.findViewById(R.id.chart_precip);
-        setupChartsAppearance();
+        chartPressure = root.findViewById(R.id.chart_pressure);
 
+        buttonBackToWeekly = root.findViewById(R.id.button_conditions_back_to_week);
+
+        // Back button: return to weekly overview charts
+        buttonBackToWeekly.setOnClickListener(v -> {
+            if (lastWeather != null) {
+                populateWeeklyCharts(lastWeather); // resets charts to weekly mode
+            }
+        });
+
+        setupChartsAppearance();
     }
+
+    // --- Location selection ---------------------------------------------------
 
     private void setupLocationSpinner() {
         locationAdapter = new ArrayAdapter<>(
@@ -191,8 +206,15 @@ public class ConditionsFragment extends Fragment {
         weatherRepository.getWeatherLiveData().observe(getViewLifecycleOwner(), weather -> {
             Log.d(TAG, "observeData: weather updated in ConditionsFragment");
             lastWeather = weather;
+
+            // 7-day strip at top
             populateDailyForecast(weather);
-            updateChartsForDay(selectedDayIndex);
+
+            // Default charts: weekly overview across 7 days (2-hour steps)
+            populateWeeklyCharts(weather);
+
+            // When user taps a day card, updateChartsForDay(dayIndex) will override
+            // these charts with per-day detail.
         });
     }
 
@@ -227,39 +249,150 @@ public class ConditionsFragment extends Fragment {
         }
     }
 
+    // --- 7-day DAILY strip (same as before, but wired to new adapter API) -----
+
     private void populateDailyForecast(WeatherResponse response) {
         if (response == null || response.daily == null) return;
 
-        textForecastTitle.setText("7-Day Forecast");
-        forecastAdapter.setMode(ForecastAdapter.Mode.DAILY);
-
         DailyWeather d = response.daily;
+
         List<String> labels = new ArrayList<>();
-        List<String> values = new ArrayList<>();
-        List<String> markers = new ArrayList<>();
+        List<String> primaryValues = new ArrayList<>();   // temp range
+        List<String> secondaryValues = new ArrayList<>(); // precip/snow summary
+        List<String> markers = new ArrayList<>();         // reserved for later
 
-        for (int i = 0; i < d.time.size(); i++) {
-            String isoDate = d.time.get(i); // "2025-12-02"
-            labels.add(isoDate);
+        java.text.SimpleDateFormat inputFormat =
+                new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+        java.text.SimpleDateFormat outputFormat =
+                new java.text.SimpleDateFormat("EEE MM/dd", java.util.Locale.US);
 
-            double tMin = d.temperatureMin.get(i);
-            double tMax = d.temperatureMax.get(i);
-            values.add(String.format("%.0f° / %.0f°", tMin, tMax));
+        int days = (d.time != null) ? d.time.size() : 0;
+        for (int i = 0; i < days; i++) {
+            String isoDate = d.time.get(i);
 
-            double precip = (d.precipitationSum != null && d.precipitationSum.size() > i)
-                    ? d.precipitationSum.get(i)
+            String dayLabel = isoDate;
+            try {
+                java.util.Date parsed = inputFormat.parse(isoDate);
+                if (parsed != null) {
+                    dayLabel = outputFormat.format(parsed);
+                }
+            } catch (Exception ignored) {
+            }
+            labels.add(dayLabel);
+
+            double tMin = (d.temperatureMin != null && d.temperatureMin.size() > i)
+                    ? d.temperatureMin.get(i)
                     : 0.0;
+            double tMax = (d.temperatureMax != null && d.temperatureMax.size() > i)
+                    ? d.temperatureMax.get(i)
+                    : 0.0;
+            String range = String.format(java.util.Locale.US, "%.0f° / %.0f°", tMin, tMax);
+            primaryValues.add(range);
+
             double snow = (d.snowfallSum != null && d.snowfallSum.size() > i)
                     ? d.snowfallSum.get(i)
                     : 0.0;
-            markers.add(String.format("Precip %.1f in · Snow %.1f in", precip, snow));
+            double precip = (d.precipitationSum != null && d.precipitationSum.size() > i)
+                    ? d.precipitationSum.get(i)
+                    : 0.0;
+
+            String precipSummary = String.format(
+                    java.util.Locale.US,
+                    "Precip %.2f in · Snow %.2f in",
+                    precip,
+                    snow
+            );
+            secondaryValues.add(precipSummary);
+
+            markers.add(""); // could mark "Best" day later
         }
 
-        forecastAdapter.setData(labels, values, markers);
+        textForecastTitle.setText("7-Day Forecast");
+        forecastAdapter.setMode(ForecastAdapter.Mode.DAILY);
+        forecastAdapter.setData(labels, primaryValues, secondaryValues, markers);
+    }
+
+    // --- Weekly charts across 7 days (2h step) --------------------------------
+
+    private void populateWeeklyCharts(WeatherResponse response) {
+        if (response == null || response.hourly == null) {
+            Log.w(TAG, "populateWeeklyCharts: missing hourly data");
+            return;
+        }
+
+        HourlyWeather h = response.hourly;
+
+        int totalHours = (h.time != null) ? h.time.size() : 0;
+        int maxHours = Math.min(totalHours, 7 * 24);
+        if (maxHours <= 0) {
+            Log.w(TAG, "populateWeeklyCharts: no hourly points");
+            return;
+        }
+
+        List<Entry> tempEntries = new ArrayList<>();
+        List<Entry> windEntries = new ArrayList<>();
+        List<BarEntry> precipEntries = new ArrayList<>();
+        List<Entry> pressureEntries = new ArrayList<>();
+        List<String> xLabels = new ArrayList<>();
+
+        java.text.SimpleDateFormat inputFormat =
+                new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.US);
+        java.text.SimpleDateFormat labelFormat =
+                new java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.US); // "Mon 06:00"
+
+        int stepIndex = 0;
+        for (int i = 0; i < maxHours; i += 2, stepIndex++) {
+
+            String timeStr = (h.time != null && h.time.size() > i)
+                    ? h.time.get(i)
+                    : null;
+
+            String label = "";
+            if (timeStr != null) {
+                try {
+                    java.util.Date parsed = inputFormat.parse(timeStr);
+                    if (parsed != null) {
+                        label = labelFormat.format(parsed);
+                    }
+                } catch (Exception ignored) {
+                    label = timeStr; // fallback
+                }
+            }
+            xLabels.add(label);
+
+            double temp = safeGetDouble(h.temperature2m, i,
+                    response.current != null ? response.current.temperature2m : 0.0);
+            double windSpeed = safeGetDouble(h.windSpeed10m, i,
+                    response.current != null ? response.current.windSpeed10m : 0.0);
+            double precip = safeGetDouble(h.precipitation, i, 0.0);
+            double pressureHpa = safeGetDouble(h.barometricPressure, i,
+                    response.current != null ? response.current.barometricPressure : 0.0);
+            double pressureInHg = hPaToInHg(pressureHpa);
+
+
+            float x = stepIndex; // index-based x; labeled via xLabels
+
+            tempEntries.add(new Entry(x, (float) temp));
+            windEntries.add(new Entry(x, (float) windSpeed));
+            precipEntries.add(new BarEntry(x, (float) precip));
+            pressureEntries.add(new Entry(x, (float) pressureInHg));
+        }
+
+        textChartTitle.setText("Weekly overview (2-hour steps)");
+
+        bindLineChart(chartTemp, "Temp (°F)", tempEntries, xLabels);
+        bindLineChart(chartWind, "Wind (mph)", windEntries, xLabels);
+        bindBarChart(chartPrecip, "Precip (in)", precipEntries, xLabels);
+        bindLineChart(chartPressure, "Pressure (inHg)", pressureEntries, xLabels);
+
+        if (buttonBackToWeekly != null) {
+            buttonBackToWeekly.setVisibility(View.GONE);
+        }
     }
 
     /**
-     * Build chart data for the selected day using hourly arrays.
+     * Per-day detail when user taps a card in the 7-day strip.
+     * Uses the same charts but focuses only on that date.
      */
     private void updateChartsForDay(int dayIndex) {
         if (lastWeather == null || lastWeather.hourly == null || lastWeather.daily == null) {
@@ -281,19 +414,31 @@ public class ConditionsFragment extends Fragment {
         List<Entry> tempEntries = new ArrayList<>();
         List<Entry> windEntries = new ArrayList<>();
         List<BarEntry> precipEntries = new ArrayList<>();
+        List<Entry> pressureEntries = new ArrayList<>();
+        List<String> xLabels = new ArrayList<>();
 
         int hourIndexForX = 0;
         for (int i = 0; i < h.time.size(); i++) {
             String iso = h.time.get(i); // "YYYY-MM-DDTHH:MM"
-            if (!iso.startsWith(dayDate)) continue;
+            if (iso == null || !iso.startsWith(dayDate)) continue;
 
-            double temp = h.temperature2m.get(i);
-            double wind = h.windSpeed10m.get(i);
-            double precip = h.precipitation.get(i);
+            String hourLabel = iso.length() >= 16 ? iso.substring(11, 16) : iso;
+            xLabels.add(hourLabel);
+
+            double temp = safeGetDouble(h.temperature2m, i,
+                    lastWeather.current != null ? lastWeather.current.temperature2m : 0.0);
+            double wind = safeGetDouble(h.windSpeed10m, i,
+                    lastWeather.current != null ? lastWeather.current.windSpeed10m : 0.0);
+            double precip = safeGetDouble(h.precipitation, i, 0.0);
+            double pressureHpa = safeGetDouble(h.barometricPressure, i,
+                    lastWeather.current != null ? lastWeather.current.barometricPressure : 0.0);
+            double pressureInHg = hPaToInHg(pressureHpa);
+
 
             tempEntries.add(new Entry(hourIndexForX, (float) temp));
             windEntries.add(new Entry(hourIndexForX, (float) wind));
             precipEntries.add(new BarEntry(hourIndexForX, (float) precip));
+            pressureEntries.add(new Entry(hourIndexForX, (float) pressureInHg));
 
             hourIndexForX++;
         }
@@ -303,43 +448,28 @@ public class ConditionsFragment extends Fragment {
             return;
         }
 
-        // Temp chart
-        LineDataSet tempSet = new LineDataSet(tempEntries, "Temp (°F)");
-        tempSet.setDrawCircles(false);
-        tempSet.setLineWidth(2f);
-        LineData tempData = new LineData(tempSet);
-        chartTemp.setData(tempData);
-        chartTemp.invalidate();
+        bindLineChart(chartTemp, "Temp (°F)", tempEntries, xLabels);
+        bindLineChart(chartWind, "Wind (mph)", windEntries, xLabels);
+        bindBarChart(chartPrecip, "Precip (in)", precipEntries, xLabels);
+        bindLineChart(chartPressure, "Pressure (inHg)", pressureEntries, xLabels);
 
-        // Wind chart
-        LineDataSet windSet = new LineDataSet(windEntries, "Wind (mph)");
-        windSet.setDrawCircles(false);
-        windSet.setLineWidth(2f);
-        LineData windData = new LineData(windSet);
-        chartWind.setData(windData);
-        chartWind.invalidate();
-
-        // Precip chart
-        BarDataSet precipSet = new BarDataSet(precipEntries, "Precip (in)");
-        BarData precipData = new BarData(precipSet);
-        chartPrecip.setData(precipData);
-        chartPrecip.invalidate();
-
-        // Alternate approach:
-        // - Use a single CombinedChart with multiple axes instead of three charts.
-        // - Add time-of-day labels on X axis via ValueFormatter for actual hours.
+        if (buttonBackToWeekly != null) {
+            buttonBackToWeekly.setVisibility(View.VISIBLE);
+        }
     }
 
+    // --- Chart appearance ----------------------------------------------------
 
     /**
      * Configure chart colors for dark background:
      *  - white axis/labels/legend text
      *  - soft grid lines
-     *  - no opaque background so it blends with fragment bg
+     *  - transparent background to blend with fragment bg
      */
     private void setupChartsAppearance() {
         styleLineChart(chartTemp);
         styleLineChart(chartWind);
+        styleLineChart(chartPressure);
         styleBarChart(chartPrecip);
     }
 
@@ -349,46 +479,7 @@ public class ConditionsFragment extends Fragment {
         chart.setDrawGridBackground(false);
         chart.setBackgroundColor(Color.TRANSPARENT);
 
-        // "No data" text
-        chart.setNoDataText("No data for selected day");
-        chart.setNoDataTextColor(Color.WHITE);
-
-        // X axis
-        XAxis xAxis = chart.getXAxis();
-        xAxis.setTextColor(Color.WHITE);
-        xAxis.setAxisLineColor(0x80FFFFFF);   // semi-transparent white
-        xAxis.setGridColor(0x40FFFFFF);       // faint grid
-
-        // Left Y axis
-        YAxis left = chart.getAxisLeft();
-        left.setTextColor(Color.WHITE);
-        left.setAxisLineColor(0x80FFFFFF);
-        left.setGridColor(0x40FFFFFF);
-
-        // Right Y axis
-        YAxis right = chart.getAxisRight();
-        right.setTextColor(Color.WHITE);
-        right.setAxisLineColor(0x80FFFFFF);
-        right.setGridColor(0x40FFFFFF);
-
-        // Legend
-        Legend legend = chart.getLegend();
-        legend.setTextColor(Color.WHITE);
-
-        // Description (if you use it)
-        Description desc = chart.getDescription();
-        if (desc != null) {
-            desc.setTextColor(Color.WHITE);
-        }
-    }
-
-    private void styleBarChart(BarChart chart) {
-        if (chart == null) return;
-
-        chart.setDrawGridBackground(false);
-        chart.setBackgroundColor(Color.TRANSPARENT);
-
-        chart.setNoDataText("No data for selected day");
+        chart.setNoDataText("No data");
         chart.setNoDataTextColor(Color.WHITE);
 
         XAxis xAxis = chart.getXAxis();
@@ -413,5 +504,135 @@ public class ConditionsFragment extends Fragment {
         if (desc != null) {
             desc.setTextColor(Color.WHITE);
         }
+    }
+
+    private void styleBarChart(BarChart chart) {
+        if (chart == null) return;
+
+        chart.setDrawGridBackground(false);
+        chart.setBackgroundColor(Color.TRANSPARENT);
+
+        chart.setNoDataText("No data");
+        chart.setNoDataTextColor(Color.WHITE);
+
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setTextColor(Color.WHITE);
+        xAxis.setAxisLineColor(0x80FFFFFF);
+        xAxis.setGridColor(0x40FFFFFF);
+
+        YAxis left = chart.getAxisLeft();
+        left.setTextColor(Color.WHITE);
+        left.setAxisLineColor(0x80FFFFFF);
+        left.setGridColor(0x40FFFFFF);
+
+        YAxis right = chart.getAxisRight();
+        right.setTextColor(Color.WHITE);
+        right.setAxisLineColor(0x80FFFFFF);
+        right.setGridColor(0x40FFFFFF);
+
+        Legend legend = chart.getLegend();
+        legend.setTextColor(Color.WHITE);
+
+        Description desc = chart.getDescription();
+        if (desc != null) {
+            desc.setTextColor(Color.WHITE);
+        }
+    }
+
+    // --- Reusable binding helpers -------------------------------------------
+
+    private void bindLineChart(LineChart chart,
+                               String label,
+                               List<Entry> entries,
+                               List<String> xLabels) {
+        if (chart == null) return;
+        if (entries == null || entries.isEmpty()) {
+            chart.clear();
+            return;
+        }
+
+        LineDataSet dataSet = new LineDataSet(entries, label);
+        dataSet.setLineWidth(2f);
+        dataSet.setDrawCircles(false);
+        dataSet.setDrawValues(false);
+        dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+        dataSet.setColor(0xFFFFFFFF);     // white line
+        dataSet.setHighLightColor(0xFFAAAAAA);
+
+        LineData data = new LineData(dataSet);
+        chart.setData(data);
+
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setDrawGridLines(false);
+        xAxis.setTextColor(0xFFFFFFFF);
+        xAxis.setLabelRotationAngle(-45f);
+        xAxis.setGranularity(1f);
+        xAxis.setValueFormatter(new IndexAxisValueFormatter(xLabels));
+
+        YAxis left = chart.getAxisLeft();
+        left.setTextColor(0xFFFFFFFF);
+        left.setDrawGridLines(true);
+
+        YAxis right = chart.getAxisRight();
+        right.setEnabled(false);
+
+        chart.getDescription().setEnabled(false);
+        chart.getLegend().setTextColor(0xFFFFFFFF);
+
+        chart.invalidate();
+    }
+
+    private void bindBarChart(BarChart chart,
+                              String label,
+                              List<BarEntry> entries,
+                              List<String> xLabels) {
+        if (chart == null) return;
+        if (entries == null || entries.isEmpty()) {
+            chart.clear();
+            return;
+        }
+
+        BarDataSet dataSet = new BarDataSet(entries, label);
+        dataSet.setDrawValues(false);
+        dataSet.setColor(0xFFFFFFFF);   // white bars
+
+        BarData data = new BarData(dataSet);
+        data.setBarWidth(0.8f);
+
+        chart.setData(data);
+
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setDrawGridLines(false);
+        xAxis.setTextColor(0xFFFFFFFF);
+        xAxis.setLabelRotationAngle(-45f);
+        xAxis.setGranularity(1f);
+        xAxis.setValueFormatter(new IndexAxisValueFormatter(xLabels));
+
+        YAxis left = chart.getAxisLeft();
+        left.setTextColor(0xFFFFFFFF);
+        left.setDrawGridLines(true);
+
+        YAxis right = chart.getAxisRight();
+        right.setEnabled(false);
+
+        chart.getDescription().setEnabled(false);
+        chart.getLegend().setTextColor(0xFFFFFFFF);
+
+        chart.setFitBars(true);
+        chart.invalidate();
+    }
+
+    // --- Small utility -------------------------------------------------------
+
+    // Convert from hPa (Open-Meteo default) to inHg for display
+    private double hPaToInHg(double hPa) {
+        return hPa * 0.0295299830714; // 1 hPa ≈ 0.02953 inHg
+    }
+    private double safeGetDouble(List<Double> list, int index, double fallback) {
+        if (list == null || index < 0 || index >= list.size()) return fallback;
+        Double v = list.get(index);
+        return (v != null) ? v : fallback;
     }
 }

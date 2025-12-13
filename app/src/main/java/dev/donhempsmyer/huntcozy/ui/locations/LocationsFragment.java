@@ -18,9 +18,11 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.List;
 
 import dev.donhempsmyer.huntcozy.R;
+import dev.donhempsmyer.huntcozy.data.locations.LocationsRepository;
 import dev.donhempsmyer.huntcozy.data.model.location.HuntLocation;
 import dev.donhempsmyer.huntcozy.ui.conditions.ConditionsFragment;
 import dev.donhempsmyer.huntcozy.ui.locations.AddLocationDialogFragment;
+import dev.donhempsmyer.huntcozy.ui.main.MainActivity;
 
 public class LocationsFragment extends Fragment {
 
@@ -89,15 +91,22 @@ public class LocationsFragment extends Fragment {
     private void onLocationClicked(HuntLocation location) {
         Log.d(TAG, "onLocationClicked: " + location);
 
-        // Navigate to ConditionsFragment with this location id
-        requireActivity().getSupportFragmentManager()
-                .beginTransaction()
-                .replace(R.id.main_fragment_container,
-                        ConditionsFragment.newInstance(location.getId()))
-                .addToBackStack(null)
-                .commit();
-    }
+        // 1) Mark this as the selected location in the shared repository
+        LocationsRepository.getInstance().selectLocation(location);
 
-    // Alternate approach:
-    // - Use Navigation Component safe args instead of manual FragmentTransactions.
+        // 2) Ask MainActivity to switch to the Conditions tab
+        if (requireActivity() instanceof MainActivity) {
+            MainActivity activity = (MainActivity) requireActivity();
+            activity.openConditionsTab();   // this calls bottomNav.setSelectedItemId(R.id.nav_conditions)
+        } else {
+            // Fallback: if for some reason this fragment isn't hosted by MainActivity
+            Log.w(TAG, "onLocationClicked: host is not MainActivity, using direct transaction fallback");
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.main_fragment_container,
+                            ConditionsFragment.newInstance(location.getId()))
+                    .addToBackStack(null)
+                    .commit();
+        }
+    }
 }

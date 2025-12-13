@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
     app:cardUseCompatPadding="true"
-    app:cardCornerRadius="8dp"
+    app:cardCornerRadius="10dp"
     app:cardElevation="2dp"
     app:strokeWidth="1dp"
     app:strokeColor="#40FFFFFF"
@@ -19,27 +19,53 @@
         android:layout_height="wrap_content"
         android:padding="12dp">
 
-        <TextView
-            android:id="@+id/text_location_name"
-            android:layout_width="wrap_content"
+        <!-- Name + optional "Current" pill -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Back Ridge Stand"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:textColor="@android:color/white" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
+            <TextView
+                android:id="@+id/text_location_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Back Ridge Stand"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/text_location_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="Current"
+                android:textSize="11sp"
+                android:textColor="@android:color/black"
+                android:background="@drawable/bg_location_badge"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Coordinates -->
         <TextView
             android:id="@+id/text_location_coords"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:text="44.5000, -88.5000"
             android:textColor="@android:color/white"
+            android:textSize="13sp"
             android:alpha="0.85" />
 
+        <!-- Meta / hint -->
         <TextView
             android:id="@+id/text_location_meta"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:text="Tap to set as current hunting location"
             android:textColor="@android:color/white"
             android:textSize="12sp"

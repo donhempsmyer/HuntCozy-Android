@@ -33,6 +33,7 @@ import dev.donhempsmyer.huntcozy.data.model.location.HuntLocation;
 import dev.donhempsmyer.huntcozy.data.model.weather.DailyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.HourlyWeather;
 import dev.donhempsmyer.huntcozy.data.model.weather.WeatherResponse;
+import dev.donhempsmyer.huntcozy.ui.main.MainActivity;
 import dev.donhempsmyer.huntcozy.ui.packing.PackingListFragment;
 import dev.donhempsmyer.huntcozy.ui.packing.PackingListViewModel;
 
@@ -60,6 +61,7 @@ public class HomeFragment extends Fragment {
     private MaterialButton btnMorningMid;
     private MaterialButton btnMidEvening;
     private MaterialButton btnAllDay;
+    private View cardCurrentWeather;
 
     // Forecast + gear
     private RecyclerView recyclerForecast;
@@ -111,6 +113,9 @@ public class HomeFragment extends Fragment {
         textCurrentWind = root.findViewById(R.id.text_current_wind);
         textCurrentPrecip = root.findViewById(R.id.text_current_precip);
 
+        cardCurrentWeather = root.findViewById(R.id.card_current_weather);
+
+
         spinnerLocation = root.findViewById(R.id.spinner_location);
         spinnerWeapon = root.findViewById(R.id.spinner_weapon);
         spinnerHuntingStyle = root.findViewById(R.id.spinner_hunting_style);
@@ -126,6 +131,29 @@ public class HomeFragment extends Fragment {
         btnAllDay = root.findViewById(R.id.btn_window_all_day);
 
         buttonBackToDaily.setOnClickListener(v -> showDailyForecast());
+
+        if (cardCurrentWeather != null) {
+            cardCurrentWeather.setOnClickListener(v -> openConditionsFromHome());
+        }
+    }
+
+    private void openConditionsFromHome() {
+        Log.d(TAG, "openConditionsFromHome: current weather card clicked");
+
+        if (requireActivity() instanceof MainActivity) {
+            // Use MainActivity so bottom nav highlights "Conditions"
+            MainActivity activity = (MainActivity) requireActivity();
+            activity.openConditionsTab();
+        } else {
+            // Fallback: direct fragment transaction if host isn't MainActivity
+            Log.w(TAG, "openConditionsFromHome: host is not MainActivity, using direct transaction fallback");
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.main_fragment_container,
+                            dev.donhempsmyer.huntcozy.ui.conditions.ConditionsFragment.newInstance())
+                    .addToBackStack(null)
+                    .commit();
+        }
     }
 
     /**
@@ -226,7 +254,27 @@ public class HomeFragment extends Fragment {
         spinnerWeapon.setOnItemSelectedListener(new SimpleItemSelectedListener() {
             @Override
             public void onItemSelected(int position) {
-                viewModel.setWeaponType(types[position]);
+                WeaponType selected = types[position];
+                WeaponType current = viewModel.getWeaponType().getValue();
+                if (current != selected) {
+                    viewModel.setWeaponType(selected);
+                }
+            }
+        });
+        // ViewModel → Spinner (restore selection when returning)
+        viewModel.getWeaponType().observe(getViewLifecycleOwner(), type -> {
+            if (type == null) return;
+
+            int index = -1;
+            for (int i = 0; i < types.length; i++) {
+                if (types[i] == type) {
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index >= 0 && spinnerWeapon.getSelectedItemPosition() != index) {
+                spinnerWeapon.setSelection(index);
             }
         });
     }
@@ -244,7 +292,28 @@ public class HomeFragment extends Fragment {
         spinnerHuntingStyle.setOnItemSelectedListener(new SimpleItemSelectedListener() {
             @Override
             public void onItemSelected(int position) {
-                viewModel.setHuntingStyle(styles[position]);
+                HuntingStyle selected = styles[position];
+                HuntingStyle current = viewModel.getHuntingStyle().getValue();
+                if (current != selected) {
+                    viewModel.setHuntingStyle(selected);
+                }
+            }
+        });
+
+        // ViewModel → Spinner
+        viewModel.getHuntingStyle().observe(getViewLifecycleOwner(), style -> {
+            if (style == null) return;
+
+            int index = -1;
+            for (int i = 0; i < styles.length; i++) {
+                if (styles[i] == style) {
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index >= 0 && spinnerHuntingStyle.getSelectedItemPosition() != index) {
+                spinnerHuntingStyle.setSelection(index);
             }
         });
     }
@@ -272,10 +341,7 @@ public class HomeFragment extends Fragment {
     }
 
     private void setupHuntWindowToggle() {
-        // Default to All-Day
-        groupHuntWindow.check(R.id.btn_window_all_day);
-        viewModel.setHuntWindow(HuntWindow.ALL_DAY);
-
+        // 1) Listen for user changes: Toggle -> ViewModel
         groupHuntWindow.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
             if (!isChecked) return;
 
@@ -288,12 +354,41 @@ public class HomeFragment extends Fragment {
                 window = HuntWindow.ALL_DAY;
             }
 
-            viewModel.setHuntWindow(window);
+            // Only update if it actually changed
+            HuntWindow current = viewModel.getHuntWindow().getValue();
+            if (current != window) {
+                viewModel.setHuntWindow(window);
+            }
         });
 
-        // Keep toggle in sync with ViewModel (e.g. if HuntWindow is changed elsewhere)
+        // 2) Initialize from ViewModel (or default once)
+        HuntWindow current = viewModel.getHuntWindow().getValue();
+        if (current == null) {
+            current = HuntWindow.ALL_DAY;          // first-time default
+            viewModel.setHuntWindow(current);
+        }
+
+        int initialId;
+        switch (current) {
+            case MORNING_MID:
+                initialId = R.id.btn_window_morning_mid;
+                break;
+            case MID_EVENING:
+                initialId = R.id.btn_window_mid_evening;
+                break;
+            case ALL_DAY:
+            default:
+                initialId = R.id.btn_window_all_day;
+                break;
+        }
+        if (groupHuntWindow.getCheckedButtonId() != initialId) {
+            groupHuntWindow.check(initialId);
+        }
+
+        // 3) ViewModel -> Toggle (keeps things in sync if changed elsewhere)
         viewModel.getHuntWindow().observe(getViewLifecycleOwner(), window -> {
             if (window == null) return;
+
             int id;
             switch (window) {
                 case MORNING_MID:
@@ -345,9 +440,16 @@ public class HomeFragment extends Fragment {
                 response.current.apparentTemperature);
         textCurrentTemp.setText(tempText);
 
-        String windText = String.format("Wind %.0f mph %.0f°",
-                response.current.windSpeed10m,
-                response.current.windDirection10m);
+        double windSpeed = response.current.windSpeed10m;
+        double windDirDeg = response.current.windDirection10m;
+        String windDirText = bearingToCompass(windDirDeg);
+
+        String windText = String.format(
+                "Wind %.0f mph %s",
+                windSpeed,
+                windDirText,
+                windDirDeg
+        );
         textCurrentWind.setText(windText);
 
         double baroHpa = response.current.barometricPressure;
@@ -362,9 +464,11 @@ public class HomeFragment extends Fragment {
         textCurrentPrecip.setText(precipText);
     }
 
+    // HomeFragment.java
     private void populateDailyForecast(WeatherResponse response) {
         if (response == null || response.daily == null) return;
 
+        // Reset UI to "daily" mode
         textForecastTitle.setText("7-Day Forecast");
         buttonBackToDaily.setVisibility(View.GONE);
         forecastAdapter.setMode(ForecastAdapter.Mode.DAILY);
@@ -372,30 +476,62 @@ public class HomeFragment extends Fragment {
         DailyWeather d = response.daily;
 
         List<String> labels = new ArrayList<>();
-        List<String> values = new ArrayList<>();
-        List<String> markers = new ArrayList<>();
+        List<String> primaryValues = new ArrayList<>();   // temp range
+        List<String> secondaryValues = new ArrayList<>(); // precip/snow summary
+        List<String> markers = new ArrayList<>();         // (unused for now)
 
-        for (int i = 0; i < d.time.size(); i++) {
+        java.text.SimpleDateFormat inputFormat =
+                new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+        java.text.SimpleDateFormat outputFormat =
+                new java.text.SimpleDateFormat("EEE MM/dd", java.util.Locale.US); // "Mon 12/09"
+
+        int days = (d.time != null) ? d.time.size() : 0;
+        for (int i = 0; i < days; i++) {
             String isoDate = d.time.get(i); // "2025-12-02"
-            String dayLabel = isoDate;      // TODO: prettify
+
+            // Pretty label
+            String dayLabel = isoDate;
+            try {
+                java.util.Date parsed = inputFormat.parse(isoDate);
+                if (parsed != null) {
+                    dayLabel = outputFormat.format(parsed);
+                }
+            } catch (Exception ignored) {
+            }
             labels.add(dayLabel);
 
-            double tMin = d.temperatureMin.get(i);
-            double tMax = d.temperatureMax.get(i);
-            String range = String.format("%.0f° / %.0f°", tMin, tMax);
-            values.add(range);
+            // Hi/Lo temps (defensive checks)
+            double tMin = (d.temperatureMin != null && d.temperatureMin.size() > i)
+                    ? d.temperatureMin.get(i)
+                    : 0.0;
+            double tMax = (d.temperatureMax != null && d.temperatureMax.size() > i)
+                    ? d.temperatureMax.get(i)
+                    : 0.0;
+            String range = String.format(java.util.Locale.US, "%.0f° / %.0f°", tMin, tMax);
+            primaryValues.add(range);
 
-            double snow = d.snowfallSum != null && d.snowfallSum.size() > i
+            // Precip & snow in inches (your OpenMeteo call already requests inch units)
+            double snow = (d.snowfallSum != null && d.snowfallSum.size() > i)
                     ? d.snowfallSum.get(i)
                     : 0.0;
-            double precip = d.precipitationSum != null && d.precipitationSum.size() > i
+            double precip = (d.precipitationSum != null && d.precipitationSum.size() > i)
                     ? d.precipitationSum.get(i)
                     : 0.0;
-            String marker = String.format("Precip %.1f mm · Snow %.1f cm", precip, snow);
-            markers.add(marker);
+
+            String precipSummary = String.format(
+                    java.util.Locale.US,
+                    "Precip %.2f in · Snow %.2f in",
+                    precip,
+                    snow
+            );
+            secondaryValues.add(precipSummary);
+
+            // No special marker yet (could use "Best" day later)
+            markers.add("");
         }
 
-        forecastAdapter.setData(labels, values, markers);
+        // New 4-arg adapter API
+        forecastAdapter.setData(labels, primaryValues, secondaryValues, markers);
     }
 
     private void showHourlyForecastForDay(int dayIndex) {
@@ -404,42 +540,126 @@ public class HomeFragment extends Fragment {
             return;
         }
 
+        DailyWeather d = lastWeather.daily;
+        HourlyWeather h = lastWeather.hourly;
+
+        if (d.time == null || dayIndex < 0 || dayIndex >= d.time.size()) {
+            Log.w(TAG, "showHourlyForecastForDay: invalid dayIndex=" + dayIndex);
+            return;
+        }
+
         textForecastTitle.setText("Hourly (selected day)");
         buttonBackToDaily.setVisibility(View.VISIBLE);
         forecastAdapter.setMode(ForecastAdapter.Mode.HOURLY);
 
-        HourlyWeather h = lastWeather.hourly;
-        DailyWeather d = lastWeather.daily;
+        // e.g. "2025-12-02"
+        String dayDate = d.time.get(dayIndex);
 
-        String dayDate = d.time.get(dayIndex); // e.g., "2025-12-02"
         List<String> labels = new ArrayList<>();
-        List<String> values = new ArrayList<>();
+        List<String> primaryValues = new ArrayList<>();
+        List<String> secondaryValues = new ArrayList<>();
         List<String> markers = new ArrayList<>();
 
-        for (int i = 0; i < h.time.size(); i++) {
-            String iso = h.time.get(i); // "2025-12-02T07:00"
-            if (!iso.startsWith(dayDate)) continue;
+        // Raw sunrise/sunset strings from OpenMeteo, e.g. "2025-12-02T07:03"
+        String sunriseStr = (d.sunrise != null && d.sunrise.size() > dayIndex)
+                ? d.sunrise.get(dayIndex)
+                : null;
+        String sunsetStr = (d.sunset != null && d.sunset.size() > dayIndex)
+                ? d.sunset.get(dayIndex)
+                : null;
 
-            String hourLabel = iso.substring(11, 16); // "HH:MM"
+        // We'll match by the hour prefix: "yyyy-MM-ddTHH"
+        String sunrisePrefix = null;
+        String sunsetPrefix = null;
+        String sunriseTime = null; // "HH:mm"
+        String sunsetTime = null;  // "HH:mm"
+
+        if (sunriseStr != null && sunriseStr.startsWith(dayDate) && sunriseStr.length() >= 16) {
+            sunrisePrefix = sunriseStr.substring(0, 13); // "2025-12-02T07"
+            sunriseTime = sunriseStr.substring(11, 16);  // "07:03"
+        }
+
+        if (sunsetStr != null && sunsetStr.startsWith(dayDate) && sunsetStr.length() >= 16) {
+            sunsetPrefix = sunsetStr.substring(0, 13);   // "2025-12-02T16"
+            sunsetTime = sunsetStr.substring(11, 16);    // "16:41"
+        }
+
+        int hours = (h.time != null) ? h.time.size() : 0;
+        for (int i = 0; i < hours; i++) {
+            String iso = h.time.get(i); // e.g. "2025-12-02T07:00"
+            if (iso == null || !iso.startsWith(dayDate)) continue;
+
+            // Label: card shows the hour bucket "HH:MM" (e.g., "07:00")
+            String hourLabel = (iso.length() >= 16) ? iso.substring(11, 16) : iso;
             labels.add(hourLabel);
 
-            double temp = h.temperature2m.get(i);
-            values.add(String.format("%.0f°", temp));
+            // Primary: temp + feels-like
+            double temp = safeGet(
+                    h.temperature2m,
+                    i,
+                    (lastWeather.current != null) ? lastWeather.current.temperature2m : 0.0
+            );
+            double apparent = safeGet(
+                    h.apparentTemperature,
+                    i,
+                    (lastWeather.current != null)
+                            ? lastWeather.current.apparentTemperature
+                            : temp
+            );
 
+            String primary = String.format(
+                    java.util.Locale.US,
+                    "%.0f° (Feels %.0f°)",
+                    temp,
+                    apparent
+            );
+            primaryValues.add(primary);
+
+            // Secondary: wind dir + speed + precip
+            double windSpeed = safeGet(
+                    h.windSpeed10m,
+                    i,
+                    (lastWeather.current != null) ? lastWeather.current.windSpeed10m : 0.0
+            );
+            double windDir = safeGet(
+                    h.windDirection10m,
+                    i,
+                    (lastWeather.current != null) ? lastWeather.current.windDirection10m : 0.0
+            );
+            double precip = safeGet(h.precipitation, i, 0.0);
+
+            String cardinal = bearingToCompass(windDir);
+            String secondary = String.format(
+                    java.util.Locale.US,
+                    "%s %.0f mph · Precip %.2f in",
+                    cardinal,
+                    windSpeed,
+                    precip
+            );
+            secondaryValues.add(secondary);
+
+            // Marker: put Sunrise/Sunset on the *exact hour bucket*.
+            // Example:
+            //  - sunriseStr: "2025-12-02T07:03"
+            //  - iso:        "2025-12-02T07:00"
+            // Both share prefix "2025-12-02T07", so we label this card.
             String marker = "";
-            String sunrise = d.sunrise.get(dayIndex);
-            String sunset = d.sunset.get(dayIndex);
-            if (iso.equals(sunrise)) {
-                marker = "Sunrise";
-            } else if (iso.equals(sunset)) {
-                marker = "Sunset";
+
+            if (sunrisePrefix != null && iso.startsWith(sunrisePrefix) && sunriseTime != null) {
+                marker = "Sunrise: " + sunriseTime;
+            }
+
+            if (sunsetPrefix != null && iso.startsWith(sunsetPrefix) && sunsetTime != null) {
+                if (!marker.isEmpty()) {
+                    marker += " · ";
+                }
+                marker += "Sunset: " + sunsetTime;
             }
 
             markers.add(marker);
         }
 
-        // TODO: In v2, compute hi/lo temp times of day
-        forecastAdapter.setData(labels, values, markers);
+        forecastAdapter.setData(labels, primaryValues, secondaryValues, markers);
     }
 
     private void showDailyForecast() {
@@ -450,21 +670,31 @@ public class HomeFragment extends Fragment {
     }
 
     private void navigateToPackingList(GearItem item) {
-        Log.d(TAG, "navigateToPackingList: clicked gear " + item.getName());
+        Log.d(TAG, "navigateToPackingList: clicked gear " +
+                (item != null ? item.getName() : "null"));
 
+        // 1) Share context with PackingListViewModel (weapon + style)
         PackingListViewModel packingVM =
                 new ViewModelProvider(requireActivity()).get(PackingListViewModel.class);
 
-        packingVM.setContextFromHome(
-                viewModel.getWeaponType().getValue(),
-                viewModel.getHuntingStyle().getValue()
-        );
+        // Safely grab current weapon/style from HomeViewModel
+        WeaponType weapon = viewModel.getWeaponType().getValue();
+        HuntingStyle style = viewModel.getHuntingStyle().getValue();
+        packingVM.setContextFromHome(weapon, style);
 
-        requireActivity().getSupportFragmentManager()
-                .beginTransaction()
-                .replace(R.id.main_fragment_container, PackingListFragment.newInstance())
-                .addToBackStack(null)
-                .commit();
+        // 2) Ask MainActivity to switch to the Packing tab so bottom nav stays in sync
+        if (requireActivity() instanceof MainActivity) {
+            MainActivity activity = (MainActivity) requireActivity();
+            activity.openPackingTab();   // internally calls bottomNav.setSelectedItemId(R.id.nav_packing_list)
+        } else {
+            // Fallback: direct fragment transaction if host isn't MainActivity
+            Log.w(TAG, "navigateToPackingList: host is not MainActivity, using direct transaction fallback");
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.main_fragment_container, PackingListFragment.newInstance())
+                    .addToBackStack(null)
+                    .commit();
+        }
     }
 
 
@@ -488,6 +718,24 @@ public class HomeFragment extends Fragment {
         }
 
         public abstract void onItemSelected(int position);
+    }
+
+    private double safeGet(List<Double> list, int index, double fallback) {
+        if (list == null || index < 0 || index >= list.size()) return fallback;
+        Double v = list.get(index);
+        return (v != null) ? v : fallback;
+    }
+
+    private String bearingToCompass(double bearing) {
+        String[] dirs = {
+                "N", "NNE", "NE", "ENE",
+                "E", "ESE", "SE", "SSE",
+                "S", "SSW", "SW", "WSW",
+                "W", "WNW", "NW", "NNW"
+        };
+        bearing = (bearing % 360 + 360) % 360; // normalize 0–359
+        int index = (int) Math.round(bearing / 22.5) % 16;
+        return dirs[index];
     }
 
     // Alternate approach:

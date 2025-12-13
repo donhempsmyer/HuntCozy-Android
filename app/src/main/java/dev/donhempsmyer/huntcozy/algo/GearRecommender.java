@@ -56,7 +56,7 @@ public class GearRecommender {
     /**
      * OutfitSlot: a desired "slot" in the outfit:
      *  - body zone (TORSO / LEGS / HEAD / HANDS / FEET)
-     *  - layer type (BASE / MID / INSULATION / SHELL / RAIN)
+     *  - layer type (BASE / MID / INSULATION / SHELL / RAIN / etc.)
      *  - whether it's required or just a nice-to-have.
      */
     private static class OutfitSlot {
@@ -77,29 +77,9 @@ public class GearRecommender {
     }
 
     /**
-     * Old-style method that returned top items globally.
-     * Kept for reference / debugging.
-     *
-     * v1.5+: Prefer buildOutfitFromCloset().
-     */
-    @Deprecated
-    public List<GearItem> recommendFromCloset(
-            List<GearItem> closet,
-            CurrentWeather current,
-            WeaponType weaponType,
-            HuntingStyle huntingStyle
-    ) {
-        Log.w(TAG, "recommendFromCloset: deprecated; prefer buildOutfitFromCloset()");
-        return buildOutfitFromCloset(closet, current, weaponType, huntingStyle);
-    }
-
-    /**
-     * New main entry point:
+     * Main entry point:
      *  - Builds an outfit by BodyZone x LayerType, rather than just ranking items.
-     *  - Uses raw temperature for now; we'll refine to apparent temperature later.
-     *
-     * Note: current "weather" is still CurrentWeather; later we may switch
-     * to a HuntWindowConditions object (min/max temp, wind, precip for the hunt period).
+     *  - Uses apparent temperature ("feels-like") as the primary temp signal.
      */
     public List<GearItem> buildOutfitFromCloset(
             List<GearItem> closet,
@@ -112,38 +92,41 @@ public class GearRecommender {
             return new ArrayList<>();
         }
 
-        // v1: use raw temperature as "effective"; later we can integrate
-        // apparentTemperature and wind into a better feels-like metric.
-        double rawTempF = current.temperature2m;
-        double apparentTempF = current.apparentTemperature;
+        // NEW: keep both raw and feels-like around explicitly
+        double rawTempF = current.temperature2m;        // air temp (already in °F in your app)
+        double apparentTempF = current.apparentTemperature; // feels-like (also °F)
+
         double windMph = current.windSpeed10m;
         double precipTotalIn = current.precipitation + current.snowfall;
 
+        // IMPORTANT CHANGE:
+        // Use RAW temp for band classification (which controls which layers exist),
+        // so we don't bounce between bands just because wind adds a small chill.
         TempBand tempBand = classifyTempBand(apparentTempF);
         PrecipBand precipBand = classifyPrecipBand(precipTotalIn);
 
-        Log.d(TAG, "buildOutfitFromCloset: rawTemp=" + rawTempF
-                + "F apparentTemp=" + apparentTempF
+        Log.d(TAG, "buildOutfitFromCloset: apparentTemp=" + apparentTempF
                 + "F band=" + tempBand
                 + " wind=" + windMph + " mph"
                 + " precipTotal=" + precipTotalIn + " in band=" + precipBand
                 + " style=" + huntingStyle + " weapon=" + weaponType);
 
+        // For style-based tweaks, also use RAW temp (same reason: more stable bands).
         List<OutfitSlot> desiredSlots =
-                determineDesiredSlots(tempBand, precipBand, windMph, huntingStyle);
+                determineDesiredSlots(tempBand, precipBand, windMph, huntingStyle, rawTempF);
 
         for (OutfitSlot slot : desiredSlots) {
             Log.d(TAG, "desired slot: " + slot);
         }
 
-        // For each slot, find the best matching item from the closet.
+        // For scoring, we still use FEELS-LIKE (apparentTempF) to judge comfort.
         Set<GearItem> outfitSet = new LinkedHashSet<>();
 
         for (OutfitSlot slot : desiredSlots) {
             GearItem best = selectBestItemForSlot(
                     closet,
                     slot,
-                    apparentTempF,
+                    apparentTempF,      // <- still feels-like here
                     windMph,
                     precipTotalIn,
                     weaponType,
@@ -154,7 +137,6 @@ public class GearRecommender {
                 Log.d(TAG, "selectBestItemForSlot: slot=" + slot + " -> " + best.getName());
                 outfitSet.add(best);
             } else if (slot.required) {
-                // TODO: surface this as a user-facing note later ("You don't own any X for Y").
                 Log.w(TAG, "selectBestItemForSlot: REQUIRED slot has no item. "
                         + "Consider recommending purchase: zone=" + slot.zone
                         + " layer=" + slot.layerType);
@@ -163,8 +145,8 @@ public class GearRecommender {
             }
         }
 
-        // Deduplicated, insertion-order preserved outfit.
-        return new ArrayList<>(outfitSet);
+        List<GearItem> rawOutfit = new ArrayList<>(outfitSet);
+        return simplifyOutfit(rawOutfit);
     }
 
     // ------------------------------------------------------------------------
@@ -185,55 +167,85 @@ public class GearRecommender {
         return PrecipBand.WET;
     }
 
-    // ------------------------------------------------------------------------
-    // Determine desired slots by temp / precip / style
-    // ------------------------------------------------------------------------
-
     /**
-     * Determine which BodyZone x LayerType slots we want for this hunt.
-     *
-     * Notes:
-     *  - Shell vs Rain: "either, but not both" per zone in most cases.
-     *  - Style (e.g. TREESTAND vs SPOT_AND_STALK) may shift required/optional.
+     * Returns a 0–14 "offset within band" based on apparent temp.
+     * Each band is treated as ~15°F wide.
      */
-    private List<OutfitSlot> determineDesiredSlots(
-            TempBand tempBand,
-            PrecipBand precipBand,
-            double windMph,
-            HuntingStyle style
-    ) {
-        List<OutfitSlot> slots = new ArrayList<>();
+    private int tempOffsetWithinBand(TempBand band, double apparentTempF) {
+        double min;
+        switch (band) {
+            case VERY_COLD:
+                min = 5.0;
+                break;
+            case COLD:
+                min = 20.0;
+                break;
+            case COOL:
+                min = 35.0;
+                break;
+            case MILD:
+                min = 50.0;
+                break;
+            case HOT:
+            default:
+                min = 65.0;
+                break;
+        }
 
-        // We'll treat treestand as effectively colder (we sit a lot),
-        // and spot & stalk as effectively warmer (we move more).
-        TempBand adjustedBand = adjustTempBandForStyle(tempBand, style);
-
-        // TORSO logic
-        slots.addAll(desiredTorsoSlots(adjustedBand, precipBand, windMph));
-
-        // LEGS logic
-        slots.addAll(desiredLegSlots(adjustedBand, precipBand));
-
-        // HEAD logic
-        slots.addAll(desiredHeadSlots(adjustedBand, precipBand));
-
-        // HANDS & FEET
-        slots.addAll(desiredHandSlots(adjustedBand, precipBand));
-        slots.addAll(desiredFeetSlots(adjustedBand, precipBand));
-
-        return slots;
+        double clamped = Math.max(min, Math.min(apparentTempF, min + 14.99));
+        int offset = (int) Math.round(clamped - min); // 0..14
+        if (offset < 0) offset = 0;
+        if (offset > 14) offset = 14;
+        return offset;
     }
 
-    private TempBand adjustTempBandForStyle(TempBand base, HuntingStyle style) {
-        // Simple: treestand -> "colder" one band, spot_and_stalk -> "warmer" one band.
+    /**
+     * Adjusts temp band based on style using the within-band index (0–14),
+     * so we don't always jump a full band just because you're in a treestand.
+     */
+    private TempBand adjustTempBandForStyle(
+            TempBand base,
+            double apparentTempF,
+            HuntingStyle style
+    ) {
+        int offset = tempOffsetWithinBand(base, apparentTempF);
+
+        // negative = "colder", positive = "warmer"
+        int delta;
         switch (style) {
             case TREESTAND:
-                return shiftColder(base);
+                // Feels several degrees colder but not always a full band.
+                delta = -4;
+                break;
+            case STILL_HUNTING:
+                // Slightly colder than neutral.
+                delta = -2;
+                break;
             case SPOT_AND_STALK:
-                return shiftWarmer(base);
+                // Moving more, feels warmer.
+                delta = +4;
+                break;
+            case GROUND_BLIND:
+                // Mildly colder, but sheltered from wind vs open treestand.
+                delta = -1;
+                break;
             default:
-                return base;
+                delta = 0;
+                break;
         }
+
+        int newOffset = offset + delta;
+        TempBand result = base;
+
+        if (newOffset < 0) {
+            // Only spill into colder band if we pushed past the bottom
+            result = shiftColder(base);
+        } else if (newOffset > 14) {
+            // Only spill into warmer band if we pushed past the top
+            result = shiftWarmer(base);
+        }
+
+        return result;
     }
 
     private TempBand shiftColder(TempBand band) {
@@ -266,6 +278,45 @@ public class GearRecommender {
         }
     }
 
+    // ------------------------------------------------------------------------
+    // Determine desired slots by temp / precip / style
+    // ------------------------------------------------------------------------
+
+    /**
+     * Determine which BodyZone x LayerType slots we want for this hunt.
+     *
+     * Notes:
+     *  - Shell vs Rain: "either, but not both" per zone in most cases.
+     *  - Style (e.g. TREESTAND vs SPOT_AND_STALK) adjusts the effective temp band.
+     */
+    private List<OutfitSlot> determineDesiredSlots(
+            TempBand tempBand,
+            PrecipBand precipBand,
+            double windMph,
+            HuntingStyle style,
+            double apparentTempF
+    ) {
+        List<OutfitSlot> slots = new ArrayList<>();
+
+        // Softer, index-based adjustment instead of hard band jumps
+        TempBand adjustedBand = adjustTempBandForStyle(tempBand, apparentTempF, style);
+
+        // TORSO logic
+        slots.addAll(desiredTorsoSlots(adjustedBand, precipBand, windMph));
+
+        // LEGS logic
+        slots.addAll(desiredLegSlots(adjustedBand, precipBand));
+
+        // HEAD logic
+        slots.addAll(desiredHeadSlots(adjustedBand, precipBand));
+
+        // HANDS & FEET
+        slots.addAll(desiredHandSlots(adjustedBand, precipBand));
+        slots.addAll(desiredFeetSlots(adjustedBand, precipBand));
+
+        return slots;
+    }
+
     // -------- TORSO ----------------------------------------------------------------
 
     private List<OutfitSlot> desiredTorsoSlots(
@@ -275,15 +326,14 @@ public class GearRecommender {
     ) {
         List<OutfitSlot> slots = new ArrayList<>();
 
-        boolean windy = windMph > 15.0;
-        boolean wet = precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT;
+        boolean wet = (precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT);
+        boolean windy = windMph > 12.0; // align with your "high" bucket
 
         switch (tempBand) {
             case HOT:
-                // base optional, shell or rain only if wind/wet
-                slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.BASE, false));
+                // No base layer in HOT band.
+                // Only add an outer layer if wind/wet justify it.
                 if (wet) {
-                    // Shell vs Rain: prefer RAIN instead of SHELL in wet.
                     slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.RAIN, true));
                 } else if (windy) {
                     slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.SHELL, true));
@@ -291,8 +341,7 @@ public class GearRecommender {
                 break;
 
             case MILD:
-                slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.BASE, true));
-                slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.MID, false));
+                slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.MID, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.RAIN, true));
                 } else if (windy) {
@@ -326,7 +375,6 @@ public class GearRecommender {
                 slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.BASE, true));
                 slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.MID, true));
                 slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.INSULATION, true));
-                // Shell vs Rain: prefer RAIN in wet, otherwise SHELL for wind
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.RAIN, true));
                 } else {
@@ -345,21 +393,21 @@ public class GearRecommender {
             PrecipBand precipBand
     ) {
         List<OutfitSlot> slots = new ArrayList<>();
-        boolean wet = precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT;
+        boolean wet = (precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT);
 
         switch (tempBand) {
             case HOT:
-                // base mostly optional
-                slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.BASE, false));
+                // No leg base layer in HOT — assume main pant handles it.
                 break;
 
             case MILD:
-                slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.BASE, false));
                 break;
 
             case COOL:
                 slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.BASE, true));
-                slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.INSULATION, false));
+                if (wet) {
+                    slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.RAIN, true));
+                }
                 break;
 
             case COLD:
@@ -390,31 +438,26 @@ public class GearRecommender {
             PrecipBand precipBand
     ) {
         List<OutfitSlot> slots = new ArrayList<>();
-        boolean wet = precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT;
-
-        // For HEAD we use HEADGEAR as the primary layer type.
-        // Thickness / warmth is expressed by the GearAttributes (insulation, etc.),
-        // so we don't need separate BASE vs INSULATION layer types here.
+        boolean wet = (precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT);
 
         switch (tempBand) {
             case HOT:
                 // Cap / light headgear optional
                 slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.HEADGEAR, false));
                 if (wet) {
-                    // Dedicated rain hood / hat
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
                 break;
 
             case MILD:
-                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.BASE, false));
+                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.HEADGEAR, false));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
                 break;
 
             case COOL:
-                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.BASE, true));
+                slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.HEADGEAR, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
@@ -426,9 +469,8 @@ public class GearRecommender {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
                 }
                 break;
+
             case VERY_COLD:
-                // In colder bands we still just pick one HEADGEAR item,
-                // but the recommender should prefer higher-insulation pieces.
                 slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.INSULATED_HEADGEAR, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HEAD, LayerType.RAIN, true));
@@ -446,25 +488,16 @@ public class GearRecommender {
             PrecipBand precipBand
     ) {
         List<OutfitSlot> slots = new ArrayList<>();
-        boolean wet = precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT;
-
-        // For HANDS we use GLOVE as the main type.
-        // If you later add liners, we can treat them as a separate LayerType,
-        // but for now one GLOVE slot per outfit is enough.
+        boolean wet = (precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT);
 
         switch (tempBand) {
             case HOT:
+                break;
             case MILD:
-                // Light gloves optional; more about abrasion / minimal warmth.
-                slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.GLOVE, false));
-                if (wet) {
-                    // If you model rain over-mitts as RAIN, we can request them here.
-                    slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.RAIN, false));
-                }
+
                 break;
 
             case COOL:
-                // Gloves recommended
                 slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.GLOVE, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.RAIN, true));
@@ -479,7 +512,6 @@ public class GearRecommender {
                 break;
 
             case VERY_COLD:
-                // In cold/very cold, gloves are effectively required
                 slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.INSULATED_GLOVE, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.HANDS, LayerType.RAIN, true));
@@ -497,37 +529,25 @@ public class GearRecommender {
             PrecipBand precipBand
     ) {
         List<OutfitSlot> slots = new ArrayList<>();
-        boolean wet = precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT;
-
-        // For FEET we distinguish between SOCK and FOOTWEAR.
-        //  - SOCK: base layer on the foot
-        //  - FOOTWEAR: boots / shoes
-        // Rain can represent rubber boots or overshoes if you model them.
+        boolean wet = (precipBand == PrecipBand.WET || precipBand == PrecipBand.LIGHT);
 
         switch (tempBand) {
             case HOT:
-                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.SOCK, true));
-                if (wet) {
-                    slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, false));
-                }
+                slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
+
                 break;
 
             case MILD:
-                // In warm temps, a sock + standard footwear is usually enough.
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.SOCK, true));
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
-                if (wet) {
-                    slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, false));
-                }
+
                 break;
 
             case COOL:
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.SOCK, true));
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.FOOTWEAR, true));
-                if (wet) {
-                    slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, true));
-                }
+
                 break;
 
             case COLD:
@@ -539,7 +559,6 @@ public class GearRecommender {
                 break;
 
             case VERY_COLD:
-                // Cold: socks + insulated footwear basically required.
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.INSULATED_SOCK, true));
                 slots.add(new OutfitSlot(BodyZone.FEET, LayerType.INSULATED_FOOTWEAR, true));
                 if (wet) {
@@ -593,7 +612,7 @@ public class GearRecommender {
 
     /**
      * Slot-aware scoring; for now we just reuse the existing scoreItem logic.
-     * Later we can adjust by slot (e.g., insulation slots weight insulation higher).
+     * Later we can adjust by slot (e.g., insulation slots weight insulation more heavily).
      */
     private double scoreItemForSlot(
             GearItem item,
@@ -605,15 +624,12 @@ public class GearRecommender {
             OutfitSlot slot
     ) {
         double baseScore = scoreItem(item, apparentTempF, windMph, precipIn, weaponType, style);
-
-        // TODO: refine by slot, for example:
-        //  - if slot.layerType == INSULATION, weight insulation more heavily.
-        //  - if slot.layerType == RAIN/SHELL, weight waterproof/wind more heavily.
+        // TODO: slot-specific adjustments if needed.
         return baseScore;
     }
 
     /**
-     * Original per-item scoring logic (slightly adjusted to expect tempF / windMph / precipIn).
+     * Per-item scoring logic using apparent temp, wind, precip, style, and weapon.
      */
     private double scoreItem(
             GearItem item,
@@ -626,22 +642,29 @@ public class GearRecommender {
         GearAttributes attrs = item.getAttributes();
         if (attrs == null) return 0.0;
 
-        TempBand band = classifyTempBand(apparentTempF); // use apparent temp to understand how cold it feels
+        TempBand band = classifyTempBand(apparentTempF);
 
+        // Wind buckets (shared with wind-score logic)
+        boolean noWind = windMph < 4.0;
+        boolean lowWind = windMph >= 4.0 && windMph < 7.0;
+        boolean midWind = windMph >= 7.0 && windMph <= 12.0;
+        boolean highWind = windMph > 12.0;
 
-        // Temperature component
+        // Temperature component (comfort vs insulation/breathability)
         double tempScore;
         if (apparentTempF < attrs.getComfortTempMinF()) {
+            // colder than item is built for -> weight insulation
             tempScore = attrs.getInsulationLevel() * 0.5;
         } else if (apparentTempF > attrs.getComfortTempMaxF()) {
+            // warmer than item is built for -> weight breathability
             tempScore = attrs.getBreathabilityLevel() * 0.5;
         } else {
+            // In the comfort window, reward strongly
             tempScore = 8.0;
         }
 
         // Wind component
         double windScore = computeWindScoreForBand(attrs, band, windMph);
-
 
         // Precip component (rain + snow combined)
         double precipScore = (precipIn > 0.5)
@@ -650,14 +673,10 @@ public class GearRecommender {
 
         // Style bonus – depends on hunting style, temp band, and wind
         double styleBonus = 0.0;
-        boolean midWind = windMph > 3.0 && windMph <= 7.0;
-        boolean highWind = windMph > 7.0;
 
         switch (huntingStyle) {
             case TREESTAND: {
                 // Sitting still; insulation and windproofness matter a lot.
-                // Noise still matters but less than in run-and-gun styles.
-
                 double insWeight;
                 if (band == TempBand.COLD || band == TempBand.VERY_COLD) {
                     insWeight = 0.9;
@@ -667,8 +686,18 @@ public class GearRecommender {
                     insWeight = 0.3;
                 }
 
-                double windWeight = highWind ? 0.8 : (midWind ? 0.6 : 0.4);
-                double noiseWeight = 0.15; // small influence
+                double windWeight;
+                if (highWind) {
+                    windWeight = 0.8;
+                } else if (midWind) {
+                    windWeight = 0.6;
+                } else if (lowWind) {
+                    windWeight = 0.4;
+                } else { // noWind
+                    windWeight = 0.2;
+                }
+
+                double noiseWeight = 0.15; // treestand always somewhat noise-sensitive
 
                 styleBonus += attrs.getInsulationLevel() * insWeight;
                 styleBonus += attrs.getWindProofLevel() * windWeight;
@@ -678,8 +707,6 @@ public class GearRecommender {
 
             case GROUND_BLIND: {
                 // Inside a blind: still (need insulation), but more shielded from wind.
-                // Noise is somewhat masked by the blind.
-
                 double insWeight;
                 if (band == TempBand.COLD || band == TempBand.VERY_COLD) {
                     insWeight = 0.8;
@@ -689,8 +716,14 @@ public class GearRecommender {
                     insWeight = 0.3;
                 }
 
-                double windWeight = highWind ? 0.3 : 0.15;  // wind less important than treestand
-                double noiseWeight = 0.1;                   // noise matters, but not a top concern
+                double windWeight;
+                if (highWind || midWind) {
+                    windWeight = 0.3;
+                } else {
+                    windWeight = 0.15;
+                }
+
+                double noiseWeight = 0.1;
 
                 styleBonus += attrs.getInsulationLevel() * insWeight;
                 styleBonus += attrs.getWindProofLevel() * windWeight;
@@ -700,9 +733,8 @@ public class GearRecommender {
 
             case SPOT_AND_STALK: {
                 // Moving a lot: mobility, low bulk, and breathability are key.
-                // Low noise is important, but high wind can mask some sound.
-
-                double noiseWeight = highWind ? 0.25 : 0.6; // wind masks some noise when high
+                // Wind can mask some noise at higher speeds.
+                double noiseWeight = (midWind || highWind) ? 0.25 : 0.6;
                 double mobilityWeight = 0.7;
                 double bulkWeight = 0.6;
                 double breathWeight = 0.4;
@@ -715,16 +747,15 @@ public class GearRecommender {
             }
 
             case STILL_HUNTING: {
-                // Slow, deliberate movement: need to be quiet, reasonably warm,
-                // and able to move without fighting bulk.
-
-                double noiseWeight = highWind ? 0.3 : 0.55;
+                // Slow, deliberate movement: need to be quiet & reasonably warm,
+                // but still not fight bulk.
+                double noiseWeight = (midWind || highWind) ? 0.3 : 0.55;
                 double mobilityWeight = 0.6;
                 double bulkWeight = 0.5;
 
                 double insWeight;
                 if (band == TempBand.HOT || band == TempBand.MILD) {
-                    insWeight = 0.15; // too much insulation is bad in warm bands
+                    insWeight = 0.15;
                 } else if (band == TempBand.COOL) {
                     insWeight = 0.4;
                 } else { // COLD or VERY_COLD
@@ -752,7 +783,7 @@ public class GearRecommender {
         double score = tempScore + windScore + precipScore + styleBonus + weaponBonus;
 
         Log.d(TAG, "scoreItem: " + item.getName() + " score=" + score
-                + " (tempF=" + apparentTempF
+                + " (apparentTempF=" + apparentTempF
                 + ", wind=" + windMph
                 + ", precipIn=" + precipIn + ")");
         return score;
@@ -760,27 +791,33 @@ public class GearRecommender {
 
     /**
      * Wind score that respects both the temp band (how dangerous wind is)
-     * and your wind thresholds (<=3 low, <=7 mid, >7 high).
-     *
-     * - In HOT/MILD, windproofness matters mostly for comfort.
-     * - In COOL, it matters more.
-     * - In COLD/VERY_COLD, wind can be dangerous, so we lean hard into windproof gear.
+     * and your wind thresholds: <4, 4–7, 7–12, >12 mph.
      */
     private double computeWindScoreForBand(GearAttributes attrs, TempBand band, double windMph) {
         int windLevel = attrs.getWindProofLevel();
 
-        // Determine low / mid / high wind based on your thresholds
-        boolean lowWind = windMph <= 5.0;
-        boolean midWind = windMph > 5.0 && windMph <= 10.0;
-        boolean highWind = windMph > 10.0;
+        boolean noWind = windMph < 4.0;
+        boolean lowWind = windMph >= 4.0 && windMph < 7.0;
+        boolean midWind = windMph >= 7.0 && windMph <= 12.0;
+        boolean highWind = windMph > 12.0;
 
         double multiplier;
 
         switch (band) {
             case HOT:
+                if (noWind || lowWind) {
+                    multiplier = 0.0;
+                } else if (midWind) {
+                    multiplier = 0.1;
+                } else { // highWind
+                    multiplier = 0.2;
+                }
+                break;
+
             case MILD:
-                // Warm temps: windproof still nice but not critical
-                if (lowWind) {
+                if (noWind) {
+                    multiplier = 0.0;
+                } else if (lowWind) {
                     multiplier = 0.1;
                 } else if (midWind) {
                     multiplier = 0.3;
@@ -790,41 +827,102 @@ public class GearRecommender {
                 break;
 
             case COOL:
-                // Cool temps: windproofness more important
-                if (lowWind) {
-                    multiplier = 0.2;
+                if (noWind) {
+                    multiplier = 0.1;
+                } else if (lowWind) {
+                    multiplier = 0.3;
                 } else if (midWind) {
-                    multiplier = 0.5;
+                    multiplier = 0.6;
                 } else { // highWind
-                    multiplier = 0.8;
+                    multiplier = 0.9;
                 }
                 break;
 
             case COLD:
-                // Cold temps: wind can seriously increase chill
-                if (lowWind) {
-                    multiplier = 0.3;
+                if (noWind) {
+                    multiplier = 0.2;
+                } else if (lowWind) {
+                    multiplier = 0.5;
                 } else if (midWind) {
-                    multiplier = 0.7;
+                    multiplier = 0.9;
                 } else { // highWind
-                    multiplier = 1.0;
+                    multiplier = 1.1;
                 }
                 break;
 
             case VERY_COLD:
             default:
-                // Very cold: wind is legitimately dangerous; strongly prefer windproof
-                if (lowWind) {
-                    multiplier = 0.4;
+                if (noWind) {
+                    multiplier = 0.3;
+                } else if (lowWind) {
+                    multiplier = 0.7;
                 } else if (midWind) {
-                    multiplier = 0.9;
+                    multiplier = 1.1;
                 } else { // highWind
-                    multiplier = 1.3;  // strong bias towards high windproof pieces
+                    multiplier = 1.4;
                 }
                 break;
         }
 
         return windLevel * multiplier;
+    }
+
+    // ------------------------------------------------------------------------
+    // Outfit post-processing: merge multi-role outer pieces
+    // ------------------------------------------------------------------------
+
+    /**
+     * Simplifies the outfit by letting a single "monster" outer piece
+     * cover multiple requirements in the same body zone (insulation + rain + shell).
+     *
+     * Heuristic:
+     *  - For each zone, if we find an item with high insulation + wind + waterproof,
+     *    we keep it and remove weaker outer layers for that zone.
+     */
+    private List<GearItem> simplifyOutfit(List<GearItem> outfit) {
+        if (outfit == null || outfit.isEmpty()) return outfit;
+
+        List<GearItem> result = new ArrayList<>(outfit);
+
+        for (BodyZone zone : BodyZone.values()) {
+            GearItem multiProtector = null;
+
+            // 1) find a "do-it-all" piece for this zone
+            for (GearItem item : result) {
+                if (item.getBodyZone() != zone) continue;
+                GearAttributes a = item.getAttributes();
+                if (a == null) continue;
+
+                boolean strongIns = a.getInsulationLevel() >= 7;
+                boolean strongWind = a.getWindProofLevel() >= 7;
+                boolean strongWater = a.getWaterProofLevel() >= 7;
+
+                if (strongIns && strongWind && strongWater) {
+                    multiProtector = item;
+                    break;
+                }
+            }
+
+            if (multiProtector == null) continue;
+
+            // 2) remove weaker outer layers for that same zone
+            List<GearItem> toRemove = new ArrayList<>();
+            for (GearItem item : result) {
+                if (item == multiProtector) continue;
+                if (item.getBodyZone() != zone) continue;
+
+                LayerType lt = item.getLayerType();
+                if (lt == LayerType.SHELL
+                        || lt == LayerType.RAIN
+                        || lt == LayerType.INSULATION) {
+                    toRemove.add(item);
+                }
+            }
+
+            result.removeAll(toRemove);
+        }
+
+        return result;
     }
 
     // Alternate approach:
