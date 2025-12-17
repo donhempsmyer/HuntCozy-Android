@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "390692868392",
+    "project_id": "huntcozy-2a123",
+    "storage_bucket": "huntcozy-2a123.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:390692868392:android:668d98f443e4504f2a401d",
+        "android_client_info": {
+          "package_name": "dev.donhempsmyer.huntcozy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPp30RijJt13B55FF2liIuYEz9skgwP5s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

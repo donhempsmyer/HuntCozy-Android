@@ -682,6 +682,11 @@ public class HomeFragment extends Fragment {
         HuntingStyle style = viewModel.getHuntingStyle().getValue();
         packingVM.setContextFromHome(weapon, style);
 
+        List<GearItem> recommendedNow = viewModel.getGear().getValue();
+        if (recommendedNow != null) {
+            packingVM.setStagedFromHome(recommendedNow);   // <- you implement this in PackingListViewModel
+        }
+
         // 2) Ask MainActivity to switch to the Packing tab so bottom nav stays in sync
         if (requireActivity() instanceof MainActivity) {
             MainActivity activity = (MainActivity) requireActivity();

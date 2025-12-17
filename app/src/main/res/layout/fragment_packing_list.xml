@@ -57,11 +57,14 @@
             android:layout_weight="1"
             android:layout_marginTop="12dp"
             app:cardCornerRadius="12dp"
-            app:cardUseCompatPadding="true"
+            app:cardUseCompatPadding="false"
             app:cardElevation="3dp"
             app:cardBackgroundColor="#33FFFFFF">
 
-            <ScrollView
+            <!-- Use NestedScrollView so multiple RecyclerViews (staged/weapon/style/every/optional/packed)
+     measure correctly and don't collapse when lists get long. -->
+
+            <androidx.core.widget.NestedScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:fillViewport="true">
@@ -87,6 +90,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
+                        android:padding="4dp"
                         android:clipToPadding="false"
                         android:nestedScrollingEnabled="false" />
 
@@ -289,7 +293,7 @@
                         android:nestedScrollingEnabled="false" />
 
                 </LinearLayout>
-            </ScrollView>
+            </androidx.core.widget.NestedScrollView>
         </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>

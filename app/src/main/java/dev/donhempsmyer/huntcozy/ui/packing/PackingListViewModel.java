@@ -91,6 +91,11 @@ public class PackingListViewModel extends ViewModel {
     public void setStagedFromRecommendedIfEmpty(List<GearItem> recommended) {
         List<PackingItem> currentStaged = stagedItemsLiveData.getValue();
         boolean alreadyHasItems = currentStaged != null && !currentStaged.isEmpty();
+
+        int recommendedCount = (recommended != null) ? recommended.size() : 0;
+        Log.d(TAG, "setStagedFromRecommendedIfEmpty: alreadyHasItems=" + alreadyHasItems
+                + " recommendedCount=" + recommendedCount);
+
         if (alreadyHasItems) {
             Log.d(TAG, "setStagedFromRecommendedIfEmpty: staged not empty, skipping seed");
             return;
@@ -103,10 +108,30 @@ public class PackingListViewModel extends ViewModel {
         }
 
         List<PackingItem> staged = new ArrayList<>();
-        for (GearItem gear : recommended) {
-            if (gear == null) continue;
-            String id = gear.getId();
-            String label = gear.getName();
+
+        for (int i = 0; i < recommended.size(); i++) {
+            GearItem gear = recommended.get(i);
+            if (gear == null) {
+                Log.w(TAG, "setStagedFromRecommendedIfEmpty: recommended[" + i + "] is null, skipping");
+                continue;
+            }
+
+            String rawId = gear.getId();
+            String label = (gear.getName() != null && !gear.getName().trim().isEmpty())
+                    ? gear.getName().trim()
+                    : ("Gear #" + i);
+
+            // Make sure id is never null/blank
+            String id = (rawId != null && !rawId.trim().isEmpty())
+                    ? rawId.trim()
+                    : ("gear_" + label.hashCode() + "_" + i);
+
+            Log.d(TAG, "setStagedFromRecommendedIfEmpty: adding staged[" + i + "]"
+                    + " id=" + id
+                    + " label=" + label
+                    + " zone=" + gear.getBodyZone()
+                    + " layer=" + gear.getLayerType());
+
             staged.add(new PackingItem(
                     id,
                     label,
@@ -115,7 +140,7 @@ public class PackingListViewModel extends ViewModel {
             ));
         }
 
-        Log.d(TAG, "setStagedFromRecommendedIfEmpty: staged count=" + staged.size());
+        Log.d(TAG, "setStagedFromRecommendedIfEmpty: final staged count=" + staged.size());
         stagedItemsLiveData.setValue(staged);
     }
 
@@ -466,6 +491,40 @@ public class PackingListViewModel extends ViewModel {
         if (styleLoadoutItemsLiveData.getValue() == null) {
             styleLoadoutItemsLiveData.setValue(new ArrayList<>());
         }
+    }
+
+    public void setStagedFromHome(List<GearItem> recommended) {
+        if (recommended == null || recommended.isEmpty()) {
+            Log.d(TAG, "setStagedFromHome: recommended empty or null");
+            stagedItemsLiveData.setValue(new ArrayList<>());
+            return;
+        }
+
+        List<PackingItem> staged = new ArrayList<>();
+        for (GearItem gear : recommended) {
+            if (gear == null) continue;
+            String id = gear.getId();
+            String label = gear.getName();
+
+            if (id == null){
+                Log.d(TAG, "setStagedFromHome: " + label + " has no id, skipping");
+                continue;
+            }
+
+            Log.d(TAG, "setStagedFromHome: adding staged item id=" + id
+                    + " label=" + label
+                    + " zone=" + gear.getBodyZone()
+                    + " layer=" + gear.getLayerType());
+            staged.add(new PackingItem(
+                    id,
+                    label,
+                    gear,
+                    PackingItem.Source.STAGED
+            ));
+        }
+
+        Log.d(TAG, "setStagedFromHome: staged count=" + staged.size());
+        stagedItemsLiveData.setValue(staged);
     }
 
     // ---- Optional item helpers ----------------------------------------------

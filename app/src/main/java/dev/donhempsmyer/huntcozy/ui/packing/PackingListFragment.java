@@ -276,7 +276,22 @@ public class PackingListFragment extends Fragment {
     private void observeViewModels() {
         // Packing lists
         packingViewModel.getStagedItems().observe(getViewLifecycleOwner(), items -> {
-            Log.d(TAG, "observe staged: count=" + (items != null ? items.size() : 0));
+            int count = (items != null ? items.size() : 0);
+            Log.d(TAG, "observe staged: count=" + count);
+
+            if (items != null) {
+                for (int i = 0; i < items.size(); i++) {
+                    PackingItem pi = items.get(i);
+                    if (pi == null) continue;
+                    GearItem g = pi.getGearItem();
+                    String gearName = (g != null ? g.getName() : "null-gear");
+
+                    Log.d(TAG, "  staged[" + i + "]: id=" + pi.getId()
+                            + " label=" + pi.getLabel()
+                            + " gearName=" + gearName);
+                }
+            }
+
             stagedAdapter.setItems(items);
         });
 

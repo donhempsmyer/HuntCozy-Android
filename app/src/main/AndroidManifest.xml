@@ -16,15 +16,21 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.HuntCozy">
+
+        <!-- Launcher: AuthActivity (email/password sign-in only) -->
         <activity
-            android:name=".ui.main.MainActivity"
+            android:name=".ui.auth.AuthActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Main signed-in experience -->
+        <activity
+            android:name=".ui.main.MainActivity" />
+
     </application>
 
 </manifest>

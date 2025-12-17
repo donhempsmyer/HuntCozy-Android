@@ -15,6 +15,21 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintBottom_toTopOf="@id/bottom_nav"/>
 
+    <!-- Transparent overlay toolbar with subtle sign-out button -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/main_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@android:color/transparent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:paddingTop="24dp"
+        android:paddingEnd="8dp"
+        android:gravity="end|center_vertical"
+        app:title=""
+        app:elevation="0dp"
+        app:menu="@menu/menu_main"
+        android:theme="@style/ThemeOverlay.HuntCozy.Toolbar.Dark"/>
+
     <!-- Bottom navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav"

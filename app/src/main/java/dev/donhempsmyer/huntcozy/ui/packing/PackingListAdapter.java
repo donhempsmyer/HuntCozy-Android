@@ -1,5 +1,6 @@
 package dev.donhempsmyer.huntcozy.ui.packing;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -97,6 +98,10 @@ public class PackingListAdapter extends RecyclerView.Adapter<PackingListAdapter.
         }
 
         void bind(PackingItem item) {
+
+            Log.d("PackingListAdapter",
+                    "bind: mode=" + mode + " label=" + item.getLabel() + " id=" + item.getId());
+
             label.setText(item.getLabel());
 
             // 1) Remove listener before changing checked state

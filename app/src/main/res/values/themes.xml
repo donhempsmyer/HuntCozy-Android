@@ -5,5 +5,16 @@
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
+    <style name="ThemeOverlay.HuntCozy.Toolbar.Dark"
+        parent="ThemeOverlay.MaterialComponents.Dark.ActionBar">
+
+        <!-- Make toolbar/menu text white -->
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@android:color/white</item>
+
+        <!-- Helps menu icons/text tint as white too -->
+        <item name="colorControlNormal">@android:color/white</item>
+    </style>
+
     <style name="Theme.HuntCozy" parent="Base.Theme.HuntCozy" />
 </resources>

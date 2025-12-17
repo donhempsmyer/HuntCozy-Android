@@ -1,14 +1,21 @@
 package dev.donhempsmyer.huntcozy.ui.main;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 
+import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import dev.donhempsmyer.huntcozy.R;
+import dev.donhempsmyer.huntcozy.data.seed.FirebaseSeeder;
+import dev.donhempsmyer.huntcozy.ui.auth.AuthActivity;
 import dev.donhempsmyer.huntcozy.ui.closet.ClosetFragment;
 import dev.donhempsmyer.huntcozy.ui.conditions.ConditionsFragment;
 import dev.donhempsmyer.huntcozy.ui.home.HomeFragment;
@@ -19,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
+    private FirebaseAuth auth;
     private BottomNavigationView bottomNav;
 
     @Override
@@ -27,27 +35,91 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onCreate: started");
         setContentView(R.layout.activity_main);
 
-        bottomNav = findViewById(R.id.bottom_nav);
+        auth = FirebaseAuth.getInstance();
+        FirebaseUser user = auth.getCurrentUser();
 
-        // Centralized tab switching via bottom nav
+        // If no signed-in user, kick back to AuthActivity
+        if (user == null) {
+            Log.w(TAG, "onCreate: no signed-in user; redirecting to AuthActivity");
+            navigateToAuthAndFinish();
+            return;
+        }
+
+        // Seed Firestore structure for this user on entry (idempotent)
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        FirebaseSeeder.seedStructureForUser(db, user.getUid());
+
+        setupToolbar();
+        setupBottomNav();
+
+        if (savedInstanceState == null) {
+            Log.d(TAG, "onCreate: initial fragment = HomeFragment via bottom nav");
+            bottomNav.setSelectedItemId(R.id.nav_home);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Toolbar & sign-out
+    // ------------------------------------------------------------------------
+
+    private void setupToolbar() {
+        MaterialToolbar toolbar = findViewById(R.id.main_toolbar);
+        if (toolbar == null) {
+            Log.w(TAG, "setupToolbar: main_toolbar not found in layout");
+            return;
+        }
+
+        // We are *not* using the classic ActionBar menu callbacks,
+        // the menu is attached directly in XML with app:menu="@menu/menu_main"
+        // and handled here.
+        toolbar.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.action_sign_out) {
+                Log.d(TAG, "setupToolbar: Sign out menu clicked");
+                handleSignOut();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void handleSignOut() {
+        Log.d(TAG, "handleSignOut: signing out user");
+        auth.signOut();
+        navigateToAuthAndFinish();
+    }
+
+    private void navigateToAuthAndFinish() {
+        Intent intent = new Intent(this, AuthActivity.class);
+        // Clear back stack so user can't hit Back into MainActivity
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    // ------------------------------------------------------------------------
+    // Bottom navigation
+    // ------------------------------------------------------------------------
+
+    private void setupBottomNav() {
+        bottomNav = findViewById(R.id.bottom_nav);
+        if (bottomNav == null) {
+            Log.e(TAG, "setupBottomNav: bottom_nav not found in layout");
+            return;
+        }
+
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             Log.d(TAG, "bottomNav item selected id=" + itemId);
             switchTo(itemId);
             return true;
         });
-
-        if (savedInstanceState == null) {
-            Log.d(TAG, "onCreate: initial fragment = HomeFragment");
-            // This will BOTH select the tab AND trigger the listener above,
-            // which calls switchTo(R.id.nav_home)
-            bottomNav.setSelectedItemId(R.id.nav_home);
-        }
     }
 
     /**
      * Replace the root fragment for the selected bottom-nav item.
-     * This is only called from the BottomNavigationView listener.
+     * This is only called from the BottomNavigationView listener
+     * and from the helper methods (openHomeTab, etc.).
      */
     private void switchTo(int itemId) {
         Fragment fragment;
@@ -75,7 +147,9 @@ public class MainActivity extends AppCompatActivity {
                 .commit();
     }
 
-    // ---- Helpers for fragments to request a tab switch ----------------------
+    // ------------------------------------------------------------------------
+    // Helpers for fragments to request a tab switch
+    // ------------------------------------------------------------------------
 
     public void openHomeTab() {
         if (bottomNav != null) {

@@ -19,7 +19,7 @@ public class GearAttributes {
     private final int noiseLevel;        // 0 = silent, 10 = very noisy
     private final int mobilityLevel;     // 0 = stiff, 10 = very mobile
 
-    // Comfort temp range in °C for "typical" stationary use.
+    // Comfort temp range in °F for "typical" stationary use.
     // Recommender can adjust based on activity level and user feedback.
     private final double comfortTempMinF;
     private final double comfortTempMaxF;
