@@ -2,28 +2,52 @@ package dev.donhempsmyer.huntcozy.ui.packing;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.SetOptions;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import dev.donhempsmyer.huntcozy.data.model.GearItem;
 import dev.donhempsmyer.huntcozy.data.model.HuntingStyle;
 import dev.donhempsmyer.huntcozy.data.model.PackingItem;
 import dev.donhempsmyer.huntcozy.data.model.SavedLoadout;
 import dev.donhempsmyer.huntcozy.data.model.WeaponType;
+import dev.donhempsmyer.huntcozy.data.remote.UserFirestore;
 
 public class PackingListViewModel extends ViewModel {
 
     private static final String TAG = "PackingListViewModel";
 
+    // Firestore user context
+    private final UserFirestore userFs;
+
+    // Track current context so we only react on real changes
+    private WeaponType currentWeapon = null;
+    private HuntingStyle currentStyle = null;
+
+    // Session doc id for current packing state
+    private static final String SESSION_DOC_ID = "session_current";
+
+    // Session restore state
+    private boolean sessionRestoreRequested = false;
+    private boolean sessionRestored = false; // true only if a session doc existed
+
+
     // Recommended clothing from the GearRecommender
     private final MutableLiveData<List<PackingItem>> stagedItemsLiveData =
             new MutableLiveData<>(new ArrayList<>());
 
-    // Legacy "flat" loadout list (not really used in the new UI, but kept for saved-loadouts plumbing)
+    // Legacy "flat" loadout list (used only as a flattened view when applying/saving)
     private final MutableLiveData<List<PackingItem>> loadoutItemsLiveData =
             new MutableLiveData<>(new ArrayList<>());
 
@@ -31,7 +55,7 @@ public class PackingListViewModel extends ViewModel {
     private final MutableLiveData<List<PackingItem>> packedItemsLiveData =
             new MutableLiveData<>(new ArrayList<>());
 
-    // Saved full loadouts (weapon + style + every-hunt + optional)
+    // Saved full loadouts (weapon + style + every-hunt + optional) – in-memory only for now
     private final MutableLiveData<List<SavedLoadout>> savedLoadoutsLiveData =
             new MutableLiveData<>(new ArrayList<>());
 
@@ -48,12 +72,12 @@ public class PackingListViewModel extends ViewModel {
     private final MutableLiveData<List<PackingItem>> optionalItemsLiveData =
             new MutableLiveData<>(new ArrayList<>());
 
-    // Catalog of all optional candidates
+    // Optional catalog: dynamic; built from optional items and edits (no seeding)
     private final List<PackingItem> optionalCatalog = new ArrayList<>();
 
     public PackingListViewModel() {
         Log.d(TAG, "constructor");
-        seedDefaultLoadout();
+        userFs = UserFirestore.fromCurrentUser();
     }
 
     // ---- LiveData getters ---------------------------------------------------
@@ -82,32 +106,196 @@ public class PackingListViewModel extends ViewModel {
         return optionalItemsLiveData;
     }
 
+    // ---- RESTORE session from Firestore ------------------------------------
+
+    /**
+     * Restore packing session (staged/every/optional/packed) from Firestore if we
+     * haven't already tried. Safe to call multiple times; work is only done once per VM.
+     */
+    public void restoreStateIfNeeded() {
+        if (sessionRestoreRequested) {
+            Log.d(TAG, "restoreStateIfNeeded: already requested, skipping");
+            return;
+        }
+        sessionRestoreRequested = true;
+
+        DocumentReference docRef = userFs
+                .packingStateCollection()
+                .document(SESSION_DOC_ID);
+
+        Log.d(TAG, "restoreStateIfNeeded: fetching packingState/" + SESSION_DOC_ID);
+
+        docRef.get()
+                .addOnSuccessListener(this::applySessionSnapshot)
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "restoreStateIfNeeded: failed to load packing session", e));
+    }
+
+    private void applySessionSnapshot(DocumentSnapshot snapshot) {
+        if (snapshot == null || !snapshot.exists()) {
+            Log.d(TAG, "applySessionSnapshot: no existing packing session; starting fresh");
+            sessionRestored = false;
+            return;
+        }
+
+        sessionRestored = true;
+
+        Object stagedRaw = snapshot.get("staged");
+        Object everyRaw = snapshot.get("every");
+        Object optionalRaw = snapshot.get("optional");
+        Object packedRaw = snapshot.get("packed");
+
+        List<PackingItem> staged = fromStateList(stagedRaw, PackingItem.Source.STAGED);
+        List<PackingItem> every = fromStateList(everyRaw, PackingItem.Source.EVERY_HUNT);
+        List<PackingItem> optional = fromStateList(optionalRaw, PackingItem.Source.OPTIONAL);
+        List<PackingItem> packed = fromStateList(packedRaw, PackingItem.Source.STAGED);
+
+        Log.d(TAG, "applySessionSnapshot: restored"
+                + " staged=" + staged.size()
+                + " every=" + every.size()
+                + " optional=" + optional.size()
+                + " packed=" + packed.size());
+
+        stagedItemsLiveData.setValue(staged);
+        everyHuntItemsLiveData.setValue(every);
+        optionalItemsLiveData.setValue(optional);
+        packedItemsLiveData.setValue(packed);
+
+        rebuildOptionalCatalog(optional);
+    }
+
+    private List<PackingItem> fromStateList(Object raw, PackingItem.Source defaultSource) {
+        List<PackingItem> result = new ArrayList<>();
+        if (!(raw instanceof List)) {
+            return result;
+        }
+
+        List<?> rawList = (List<?>) raw;
+
+        for (Object entry : rawList) {
+            if (!(entry instanceof Map)) {
+                continue;
+            }
+
+            Map<?, ?> map = (Map<?, ?>) entry;
+
+            Object idObj = map.get("id");
+            Object labelObj = map.get("label");
+            Object sourceObj = map.get("source");
+
+            String id = (idObj != null) ? idObj.toString() : null;
+            String label = (labelObj != null) ? labelObj.toString() : null;
+
+            PackingItem.Source src = defaultSource;
+            if (sourceObj != null) {
+                try {
+                    src = PackingItem.Source.valueOf(sourceObj.toString());
+                } catch (IllegalArgumentException ignored) {
+                    // fall back to default
+                }
+            }
+
+            if (label == null || label.trim().isEmpty()) {
+                if (id == null) continue;
+                label = id;
+            }
+            if (id == null) {
+                id = "auto_" + label.hashCode();
+            }
+
+            result.add(new PackingItem(
+                    id,
+                    label,
+                    null,   // we don't rehydrate GearItem here; label is enough for UI
+                    src
+            ));
+        }
+        return result;
+    }
+
+    // ---- SAVE session to Firestore -----------------------------------------
+
+    /**
+     * Persist the current packing session to Firestore.
+     * Called from Fragment.onPause() and after major state changes.
+     */
+    public void saveCurrentState() {
+        DocumentReference docRef = userFs
+                .packingStateCollection()
+                .document(SESSION_DOC_ID);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("staged", toStateList(stagedItemsLiveData.getValue(), PackingItem.Source.STAGED));
+        data.put("every", toStateList(everyHuntItemsLiveData.getValue(), PackingItem.Source.EVERY_HUNT));
+        data.put("optional", toStateList(optionalItemsLiveData.getValue(), PackingItem.Source.OPTIONAL));
+        data.put("packed", toStateList(packedItemsLiveData.getValue(), PackingItem.Source.STAGED));
+        data.put("lastUpdated", FieldValue.serverTimestamp());
+
+        Log.d(TAG, "saveCurrentState: writing packingState/" + SESSION_DOC_ID + everyHuntItemsLiveData.getValue());
+
+        docRef.set(data, SetOptions.merge())
+                .addOnSuccessListener(v ->
+                        Log.d(TAG, "saveCurrentState: success"))
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "saveCurrentState: failure", e));
+    }
+
+    private List<Map<String, Object>> toStateList(List<PackingItem> items,
+                                                  PackingItem.Source defaultSource) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (items == null) return out;
+
+        for (PackingItem item : items) {
+            if (item == null) continue;
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", item.getId());
+            map.put("label", item.getLabel());
+            PackingItem.Source src = item.getSource() != null ? item.getSource() : defaultSource;
+            map.put("source", src.name());
+            out.add(map);
+        }
+        return out;
+    }
+
     // ---- Seed & initialization ----------------------------------------------
 
     /**
      * Called from PackingListFragment when it first opens, using the current
      * recommended gear from HomeViewModel.
+     * Only seeds if the staged list is currently empty, so restored sessions win.
      */
     public void setStagedFromRecommendedIfEmpty(List<GearItem> recommended) {
-        List<PackingItem> currentStaged = stagedItemsLiveData.getValue();
-        boolean alreadyHasItems = currentStaged != null && !currentStaged.isEmpty();
+        // Only treat staged + packed as "session state"
+        List<PackingItem> staged = stagedItemsLiveData.getValue();
+        List<PackingItem> packed = packedItemsLiveData.getValue();
 
-        int recommendedCount = (recommended != null) ? recommended.size() : 0;
-        Log.d(TAG, "setStagedFromRecommendedIfEmpty: alreadyHasItems=" + alreadyHasItems
-                + " recommendedCount=" + recommendedCount);
+        boolean hasSessionItems =
+                (staged != null && !staged.isEmpty()) ||
+                        (packed != null && !packed.isEmpty());
 
-        if (alreadyHasItems) {
-            Log.d(TAG, "setStagedFromRecommendedIfEmpty: staged not empty, skipping seed");
+        Log.d(TAG, "setStagedFromRecommendedIfEmpty: " +
+                "staged=" + (staged != null ? staged.size() : 0) +
+                " packed=" + (packed != null ? packed.size() : 0));
+
+        // If there is any active session state (either staged or packed),
+        // do NOT auto-seed from the recommender.
+        if (hasSessionItems) {
+            Log.d(TAG, "setStagedFromRecommendedIfEmpty: existing packing session detected," +
+                    " skipping auto-seed from recommender");
             return;
         }
+
+        int recommendedCount = (recommended != null) ? recommended.size() : 0;
+        Log.d(TAG, "setStagedFromRecommendedIfEmpty: no existing session, recommendedCount=" + recommendedCount);
 
         if (recommended == null || recommended.isEmpty()) {
             Log.d(TAG, "setStagedFromRecommendedIfEmpty: recommended empty or null");
             stagedItemsLiveData.setValue(new ArrayList<>());
+            // IMPORTANT: DO NOT CALL saveCurrentState() HERE
             return;
         }
 
-        List<PackingItem> staged = new ArrayList<>();
+        List<PackingItem> stagedList = new ArrayList<>();
 
         for (int i = 0; i < recommended.size(); i++) {
             GearItem gear = recommended.get(i);
@@ -121,7 +309,6 @@ public class PackingListViewModel extends ViewModel {
                     ? gear.getName().trim()
                     : ("Gear #" + i);
 
-            // Make sure id is never null/blank
             String id = (rawId != null && !rawId.trim().isEmpty())
                     ? rawId.trim()
                     : ("gear_" + label.hashCode() + "_" + i);
@@ -132,7 +319,7 @@ public class PackingListViewModel extends ViewModel {
                     + " zone=" + gear.getBodyZone()
                     + " layer=" + gear.getLayerType());
 
-            staged.add(new PackingItem(
+            stagedList.add(new PackingItem(
                     id,
                     label,
                     gear,
@@ -140,98 +327,44 @@ public class PackingListViewModel extends ViewModel {
             ));
         }
 
-        Log.d(TAG, "setStagedFromRecommendedIfEmpty: final staged count=" + staged.size());
-        stagedItemsLiveData.setValue(staged);
+        Log.d(TAG, "setStagedFromRecommendedIfEmpty: final staged count=" + stagedList.size());
+        stagedItemsLiveData.setValue(stagedList);
+
     }
 
-    /**
-     * Seed some optional non-clothing items.
-     * v2: this becomes user-configurable / pulled from persistence.
-     */
-    private void seedDefaultLoadout() {
-        optionalCatalog.add(new PackingItem(
-                "opt_binos",
-                "Binoculars",
-                null,
-                PackingItem.Source.OPTIONAL
-        ));
-        optionalCatalog.add(new PackingItem(
-                "opt_range",
-                "Rangefinder",
-                null,
-                PackingItem.Source.OPTIONAL
-        ));
-        optionalCatalog.add(new PackingItem(
-                "opt_thermos",
-                "Thermos",
-                null,
-                PackingItem.Source.OPTIONAL
-        ));
-        optionalCatalog.add(new PackingItem(
-                "opt_handwarmers",
-                "Hand Warmers",
-                null,
-                PackingItem.Source.OPTIONAL
-        ));
-        optionalCatalog.add(new PackingItem(
-                "opt_saw",
-                "Folding Saw",
-                null,
-                PackingItem.Source.OPTIONAL
-        ));
+    // ---- Move between lists (session state) --------------------------------
 
-        // Seed optional list with entire catalog initially
-        optionalItemsLiveData.setValue(new ArrayList<>(optionalCatalog));
-    }
-
-    // ---- Move between lists -------------------------------------------------
-
-    // STAGED (recommended clothing)
     public void onStagedItemChecked(PackingItem item, boolean checked) {
         if (item == null) return;
-
         if (checked) {
-            // staged -> packed
             moveItem(stagedItemsLiveData, packedItemsLiveData, item, "staged->packed");
         }
     }
 
-    // WEAPON LOADOUT
     public void onWeaponItemChecked(PackingItem item, boolean checked) {
         if (item == null) return;
-
         if (checked) {
-            // weapon -> packed
             moveItem(weaponLoadoutItemsLiveData, packedItemsLiveData, item, "weapon->packed");
         }
     }
 
-    // STYLE LOADOUT
     public void onStyleItemChecked(PackingItem item, boolean checked) {
         if (item == null) return;
-
         if (checked) {
-            // style -> packed
             moveItem(styleLoadoutItemsLiveData, packedItemsLiveData, item, "style->packed");
         }
     }
 
-    // EVERY-HUNT
     public void onEveryHuntItemChecked(PackingItem item, boolean checked) {
         if (item == null) return;
-
         if (checked) {
-            // every-hunt -> packed
             moveItem(everyHuntItemsLiveData, packedItemsLiveData, item, "every->packed");
         }
     }
 
-    // OPTIONAL
     public void onOptionalItemChecked(PackingItem item, boolean checked) {
         if (item == null) return;
-
         if (checked) {
-            // optional -> packed
             moveItem(optionalItemsLiveData, packedItemsLiveData, item, "optional->packed");
         }
     }
@@ -241,7 +374,6 @@ public class PackingListViewModel extends ViewModel {
 
         PackingItem.Source src = item.getSource();
         if (src == null) {
-            // Fallback: treat as staged
             Log.w(TAG, "onPackedItemUnchecked: source was null, defaulting to staged");
             moveItem(packedItemsLiveData, stagedItemsLiveData, item, "packed->staged(default)");
             return;
@@ -251,19 +383,15 @@ public class PackingListViewModel extends ViewModel {
             case STAGED:
                 moveItem(packedItemsLiveData, stagedItemsLiveData, item, "packed->staged");
                 break;
-
             case WEAPON:
                 moveItem(packedItemsLiveData, weaponLoadoutItemsLiveData, item, "packed->weapon");
                 break;
-
             case STYLE:
                 moveItem(packedItemsLiveData, styleLoadoutItemsLiveData, item, "packed->style");
                 break;
-
             case EVERY_HUNT:
                 moveItem(packedItemsLiveData, everyHuntItemsLiveData, item, "packed->every");
                 break;
-
             case OPTIONAL:
                 moveItem(packedItemsLiveData, optionalItemsLiveData, item, "packed->optional");
                 break;
@@ -298,6 +426,9 @@ public class PackingListViewModel extends ViewModel {
 
         fromLive.setValue(from);
         toLive.setValue(to);
+
+        // Any move changes the current packing session
+        saveCurrentState();
     }
 
     // ---- Edit text helpers for per-section dialogs -------------------------
@@ -309,6 +440,7 @@ public class PackingListViewModel extends ViewModel {
     public void setWeaponLoadoutFromText(String text) {
         List<PackingItem> items = fromMultiline(text, PackingItem.Source.WEAPON);
         weaponLoadoutItemsLiveData.setValue(items);
+        saveWeaponLoadoutForCurrentWeapon();
     }
 
     public String getStyleLoadoutText() {
@@ -318,6 +450,7 @@ public class PackingListViewModel extends ViewModel {
     public void setStyleLoadoutFromText(String text) {
         List<PackingItem> items = fromMultiline(text, PackingItem.Source.STYLE);
         styleLoadoutItemsLiveData.setValue(items);
+        saveStyleLoadoutForCurrentStyle();
     }
 
     public String getEveryHuntText() {
@@ -325,11 +458,59 @@ public class PackingListViewModel extends ViewModel {
     }
 
     public void setEveryHuntFromText(String text) {
+        Log.d(TAG, "setEveryHuntFromText: text=\n" + text);
         List<PackingItem> items = fromMultiline(text, PackingItem.Source.EVERY_HUNT);
+        Log.d(TAG, "setEveryHuntFromText: parsed count=" + items.size());
         everyHuntItemsLiveData.setValue(items);
+        saveCurrentState();
     }
 
-    // ---- Saved loadouts (full snapshot: weapon + style + every + optional) --
+    public String getOptionalText() {
+        return toMultiline(optionalItemsLiveData.getValue());
+    }
+
+    public void setOptionalFromText(String text) {
+        List<PackingItem> items = fromMultiline(text, PackingItem.Source.OPTIONAL);
+        optionalItemsLiveData.setValue(items);
+        rebuildOptionalCatalog(items);
+        saveCurrentState();
+    }
+
+    private String toMultiline(List<PackingItem> items) {
+        if (items == null || items.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (PackingItem item : items) {
+            if (item == null || item.getLabel() == null) continue;
+            if (sb.length() > 0) sb.append("\n");
+            sb.append(item.getLabel());
+        }
+        return sb.toString();
+    }
+
+    private List<PackingItem> fromMultiline(String text, PackingItem.Source source) {
+        List<PackingItem> list = new ArrayList<>();
+        if (text == null) return list;
+
+        String[] lines = text.split("\\r?\\n");
+        for (String raw : lines) {
+            String trimmed = raw.trim();
+            if (trimmed.isEmpty()) continue;
+            list.add(new PackingItem(
+                    "custom_" + trimmed.hashCode(),
+                    trimmed,
+                    null,
+                    source
+            ));
+        }
+        return list;
+    }
+
+    private void addAllSafe(List<PackingItem> dest, List<PackingItem> src) {
+        if (src == null) return;
+        dest.addAll(src);
+    }
+
+    // ---- Saved loadouts (in-memory only snapshot) --------------------------
 
     public void saveCurrentLoadoutAs(String name) {
         if (name == null) name = "";
@@ -339,14 +520,12 @@ public class PackingListViewModel extends ViewModel {
             return;
         }
 
-        // Combine all non-staged sections as the "loadout"
         List<PackingItem> current = new ArrayList<>();
         addAllSafe(current, weaponLoadoutItemsLiveData.getValue());
         addAllSafe(current, styleLoadoutItemsLiveData.getValue());
         addAllSafe(current, everyHuntItemsLiveData.getValue());
         addAllSafe(current, optionalItemsLiveData.getValue());
 
-        // Deep-ish copy to decouple saved snapshot from live list
         List<PackingItem> copy = new ArrayList<>();
         for (PackingItem item : current) {
             if (item == null) continue;
@@ -362,7 +541,7 @@ public class PackingListViewModel extends ViewModel {
         if (existing == null) {
             existing = new ArrayList<>();
         } else {
-            existing = new ArrayList<>(existing); // copy to avoid mutating same list
+            existing = new ArrayList<>(existing);
         }
 
         String id = "loadout_" + System.currentTimeMillis();
@@ -372,92 +551,7 @@ public class PackingListViewModel extends ViewModel {
         existing.add(loadout);
         savedLoadoutsLiveData.setValue(existing);
 
-        // Optional: keep a flattened view for legacy UI
         loadoutItemsLiveData.setValue(copy);
-    }
-
-    public void applyLoadout(String loadoutId) {
-        if (loadoutId == null) return;
-        List<SavedLoadout> saved = savedLoadoutsLiveData.getValue();
-        if (saved == null || saved.isEmpty()) {
-            Log.w(TAG, "applyLoadout: no saved loadouts");
-            return;
-        }
-
-        SavedLoadout target = null;
-        for (SavedLoadout lo : saved) {
-            if (lo != null && loadoutId.equals(lo.getId())) {
-                target = lo;
-                break;
-            }
-        }
-
-        if (target == null) {
-            Log.w(TAG, "applyLoadout: id not found " + loadoutId);
-            return;
-        }
-
-        // Split items back into sections by Source
-        List<PackingItem> weapon = new ArrayList<>();
-        List<PackingItem> style = new ArrayList<>();
-        List<PackingItem> every = new ArrayList<>();
-        List<PackingItem> optional = new ArrayList<>();
-
-        if (target.getItems() != null) {
-            for (PackingItem item : target.getItems()) {
-                if (item == null) continue;
-
-                PackingItem copy = new PackingItem(
-                        item.getId(),
-                        item.getLabel(),
-                        item.getGearItem(),
-                        item.getSource()
-                );
-
-                PackingItem.Source src = copy.getSource();
-                if (src == null) src = PackingItem.Source.EVERY_HUNT;
-
-                switch (src) {
-                    case WEAPON:
-                        weapon.add(copy);
-                        break;
-                    case STYLE:
-                        style.add(copy);
-                        break;
-                    case OPTIONAL:
-                        optional.add(copy);
-                        break;
-                    case STAGED:
-                        // Typically staged is not part of saved loadout;
-                        // if it is, we could push to staged or every-hunt. For now ignore.
-                        break;
-                    case EVERY_HUNT:
-                    default:
-                        every.add(copy);
-                        break;
-                }
-            }
-        }
-
-        Log.d(TAG, "applyLoadout: id=" + target.getId()
-                + " name=" + target.getName()
-                + " weapon=" + weapon.size()
-                + ", style=" + style.size()
-                + ", every=" + every.size()
-                + ", optional=" + optional.size());
-
-        weaponLoadoutItemsLiveData.setValue(weapon);
-        styleLoadoutItemsLiveData.setValue(style);
-        everyHuntItemsLiveData.setValue(every);
-        optionalItemsLiveData.setValue(optional);
-
-        // Optional: flattened view
-        List<PackingItem> flat = new ArrayList<>();
-        flat.addAll(weapon);
-        flat.addAll(style);
-        flat.addAll(every);
-        flat.addAll(optional);
-        loadoutItemsLiveData.setValue(flat);
     }
 
     // ---- Unpack All ---------------------------------------------------------
@@ -469,7 +563,6 @@ public class PackingListViewModel extends ViewModel {
             return;
         }
 
-        // Snapshot to avoid concurrent modification while moveItem() mutates LiveData
         List<PackingItem> snapshot = new ArrayList<>(packed);
         for (PackingItem item : snapshot) {
             onPackedItemUnchecked(item);
@@ -477,60 +570,123 @@ public class PackingListViewModel extends ViewModel {
 
         Log.d(TAG, "unpackAll: moved " + snapshot.size()
                 + " items back to their source lists");
+        saveCurrentState();
     }
 
     // ---- Context from Home (weapon/style) -----------------------------------
 
-    public void setContextFromHome(WeaponType weapon, HuntingStyle style) {
-        Log.d(TAG, "setContextFromHome: weapon=" + weapon + " style=" + style);
+    public void onWeaponTypeChanged(WeaponType weapon) {
+        if (weapon == null) return;
 
-        // v1: just ensure lists exist. v2: can load weapon/style-specific templates.
-        if (weaponLoadoutItemsLiveData.getValue() == null) {
-            weaponLoadoutItemsLiveData.setValue(new ArrayList<>());
-        }
-        if (styleLoadoutItemsLiveData.getValue() == null) {
-            styleLoadoutItemsLiveData.setValue(new ArrayList<>());
-        }
-    }
-
-    public void setStagedFromHome(List<GearItem> recommended) {
-        if (recommended == null || recommended.isEmpty()) {
-            Log.d(TAG, "setStagedFromHome: recommended empty or null");
-            stagedItemsLiveData.setValue(new ArrayList<>());
+        // No-op if it didn't actually change
+        if (weapon == currentWeapon) {
+            Log.d(TAG, "onWeaponTypeChanged: same weapon " + weapon + ", ignoring");
             return;
         }
 
-        List<PackingItem> staged = new ArrayList<>();
-        for (GearItem gear : recommended) {
-            if (gear == null) continue;
-            String id = gear.getId();
-            String label = gear.getName();
+        boolean hadPrevious = (currentWeapon != null);
 
-            if (id == null){
-                Log.d(TAG, "setStagedFromHome: " + label + " has no id, skipping");
-                continue;
-            }
+        Log.d(TAG, "onWeaponTypeChanged: " + currentWeapon + " -> " + weapon);
+        currentWeapon = weapon;
 
-            Log.d(TAG, "setStagedFromHome: adding staged item id=" + id
-                    + " label=" + label
-                    + " zone=" + gear.getBodyZone()
-                    + " layer=" + gear.getLayerType());
-            staged.add(new PackingItem(
-                    id,
-                    label,
-                    gear,
-                    PackingItem.Source.STAGED
-            ));
+        // Clear per-session lists so they don't bleed into a new context
+        if (hadPrevious) {
+            clearSessionOnContextChange();
         }
 
-        Log.d(TAG, "setStagedFromHome: staged count=" + staged.size());
-        stagedItemsLiveData.setValue(staged);
+        // Reload the per-weapon loadout from Firestore (per-weapon doc)
+        loadWeaponLoadoutFor(weapon);
     }
 
-    // ---- Optional item helpers ----------------------------------------------
+    public void onHuntingStyleChanged(HuntingStyle style) {
+        if (style == null) return;
+
+        if (style == currentStyle) {
+            Log.d(TAG, "onHuntingStyleChanged: same style " + style + ", ignoring");
+            return;
+        }
+
+        boolean hadPrevious = (currentStyle != null);
+
+        Log.d(TAG, "onHuntingStyleChanged: " + currentStyle + " -> " + style);
+        currentStyle = style;
+
+        // Clear per-session lists so they don't bleed into a new context
+        if (hadPrevious) {
+            clearSessionOnContextChange();
+        }
+
+        // Reload the per-style loadout from Firestore (per-style doc)
+        loadStyleLoadoutFor(style);
+    }
+
+
+    private void saveWeaponLoadoutForCurrentWeapon() {
+        if (currentWeapon == null) {
+            Log.w(TAG, "saveWeaponLoadoutForCurrentWeapon: currentWeapon is null, skipping");
+            return;
+        }
+
+        String docId = "weapon_" + currentWeapon.name();   // e.g. weapon_RIFLE
+        DocumentReference docRef = userFs
+                .loadoutsCollection()                      // <--- use loadoutsCollection
+                .document(docId);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("items", toStateList(
+                weaponLoadoutItemsLiveData.getValue(),
+                PackingItem.Source.WEAPON
+        ));
+        data.put("lastUpdated", FieldValue.serverTimestamp());
+
+        Log.d(TAG, "saveWeaponLoadoutForCurrentWeapon: docId=" + docId);
+
+        docRef.set(data, SetOptions.merge())
+                .addOnSuccessListener(v ->
+                        Log.d(TAG, "saveWeaponLoadoutForCurrentWeapon: success"))
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "saveWeaponLoadoutForCurrentWeapon: failure", e));
+    }
+
+
+    private void saveStyleLoadoutForCurrentStyle() {
+        if (currentStyle == null) {
+            Log.w(TAG, "saveStyleLoadoutForCurrentStyle: currentStyle is null, skipping");
+            return;
+        }
+
+        String docId = "style_" + currentStyle.name();     // e.g. style_TREESTAND
+        DocumentReference docRef = userFs
+                .loadoutsCollection()                      // <--- use loadoutsCollection
+                .document(docId);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("items", toStateList(
+                styleLoadoutItemsLiveData.getValue(),
+                PackingItem.Source.STYLE
+        ));
+        data.put("lastUpdated", FieldValue.serverTimestamp());
+
+        Log.d(TAG, "saveStyleLoadoutForCurrentStyle: docId=" + docId);
+
+        docRef.set(data, SetOptions.merge())
+                .addOnSuccessListener(v ->
+                        Log.d(TAG, "saveStyleLoadoutForCurrentStyle: success"))
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "saveStyleLoadoutForCurrentStyle: failure", e));
+    }
+
+    // ---- Optional catalog helpers ------------------------------------------
+
+    private void rebuildOptionalCatalog(List<PackingItem> optional) {
+        optionalCatalog.clear();
+        if (optional != null) {
+            optionalCatalog.addAll(optional);
+        }
+    }
 
     public List<PackingItem> getAvailableOptionalCandidates() {
-        // Gather all items currently in the entire packing list
+        // Items currently in use anywhere in the packing list
         List<PackingItem> inUse = new ArrayList<>();
         addAllSafe(inUse, stagedItemsLiveData.getValue());
         addAllSafe(inUse, weaponLoadoutItemsLiveData.getValue());
@@ -557,53 +713,86 @@ public class PackingListViewModel extends ViewModel {
         return result;
     }
 
-    private void addAllSafe(List<PackingItem> dest, List<PackingItem> src) {
-        if (src == null) return;
-        dest.addAll(src);
-    }
-
     public void addOptionalItems(List<PackingItem> newItems) {
+        if (newItems == null || newItems.isEmpty()) return;
+
         List<PackingItem> current = optionalItemsLiveData.getValue();
         if (current == null) current = new ArrayList<>();
         else current = new ArrayList<>(current);
 
         current.addAll(newItems);
         optionalItemsLiveData.setValue(current);
+
+        // Also track candidates in catalog
+        optionalCatalog.addAll(newItems);
+
+        saveCurrentState();
     }
 
-    // ---- Text <-> items helpers ---------------------------------------------
+    private void loadWeaponLoadoutFor(@NonNull WeaponType weapon) {
+        String docId = "weapon_" + weapon.name();   // e.g. weapon_RIFLE
+        Log.d(TAG, "loadWeaponLoadoutFor: docId=" + docId);
 
-    private String toMultiline(List<PackingItem> items) {
-        if (items == null || items.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (PackingItem item : items) {
-            if (item == null || item.getLabel() == null) continue;
-            if (sb.length() > 0) sb.append("\n");
-            sb.append(item.getLabel());
-        }
-        return sb.toString();
+        // Clear current list immediately so we don't show stale values
+        weaponLoadoutItemsLiveData.setValue(new ArrayList<>());
+
+        userFs.loadoutsCollection()
+                .document(docId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot == null || !snapshot.exists()) {
+                        Log.d(TAG, "loadWeaponLoadoutFor: no doc for " + weapon + " (fresh / default)");
+                        // keep the list empty
+                        return;
+                    }
+
+                    Object raw = snapshot.get("items");  // <-- make sure your save code uses this field name
+                    List<PackingItem> items = fromStateList(raw, PackingItem.Source.WEAPON);
+                    Log.d(TAG, "loadWeaponLoadoutFor: " + weapon + " items=" + items.size());
+                    weaponLoadoutItemsLiveData.setValue(items);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "loadWeaponLoadoutFor: failed for " + weapon, e);
+                    // On failure, we keep the list cleared
+                    weaponLoadoutItemsLiveData.setValue(new ArrayList<>());
+                });
     }
 
-    private List<PackingItem> fromMultiline(String text, PackingItem.Source source) {
-        List<PackingItem> list = new ArrayList<>();
-        if (text == null) return list;
+    private void loadStyleLoadoutFor(@NonNull HuntingStyle style) {
+        String docId = "style_" + style.name();     // e.g. style_TREESTAND
+        Log.d(TAG, "loadStyleLoadoutFor: docId=" + docId);
 
-        String[] lines = text.split("\\r?\\n");
-        for (String raw : lines) {
-            String trimmed = raw.trim();
-            if (trimmed.isEmpty()) continue;
-            // gearItem = null means non-clothing
-            list.add(new PackingItem(
-                    "custom_" + trimmed.hashCode(),
-                    trimmed,
-                    null,
-                    source
-            ));
-        }
-        return list;
+        // Clear current list immediately so we don't show stale values
+        styleLoadoutItemsLiveData.setValue(new ArrayList<>());
+
+        userFs.loadoutsCollection()
+                .document(docId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot == null || !snapshot.exists()) {
+                        Log.d(TAG, "loadStyleLoadoutFor: no doc for " + style + " (fresh / default)");
+                        // keep the list empty
+                        return;
+                    }
+
+                    Object raw = snapshot.get("items");  // <-- must match your save field
+                    List<PackingItem> items = fromStateList(raw, PackingItem.Source.STYLE);
+                    Log.d(TAG, "loadStyleLoadoutFor: " + style + " items=" + items.size());
+                    styleLoadoutItemsLiveData.setValue(items);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "loadStyleLoadoutFor: failed for " + style, e);
+                    // On failure, we keep the list cleared
+                    styleLoadoutItemsLiveData.setValue(new ArrayList<>());
+                });
     }
+    private void clearSessionOnContextChange() {
+        Log.d(TAG, "clearSessionOnContextChange: clearing staged + packed");
 
-    // Alternate approach:
-    // - Keep a single master list with a 'state' enum: STAGED / WEAPON / STYLE / EVERY / OPTIONAL / PACKED,
-    //   and expose filtered LiveData via Transformations.map().
+        // Clear the per-session lists
+        stagedItemsLiveData.setValue(new ArrayList<>());
+        packedItemsLiveData.setValue(new ArrayList<>());
+        saveCurrentState();
+
+    }
 }

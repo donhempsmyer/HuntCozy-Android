@@ -22,8 +22,7 @@ import dev.donhempsmyer.huntcozy.data.model.location.HuntLocation;
 
 /**
  * Dialog for adding a new hunting location.
- * v1: simple name + lat + lon, directly inserts into LocationsRepository.
- * v2: we can add validation, notes, map picker, etc.
+ * v2: uses Firestore-backed LocationsRepository with String IDs.
  */
 public class AddLocationDialogFragment extends DialogFragment {
 
@@ -58,9 +57,7 @@ public class AddLocationDialogFragment extends DialogFragment {
                 .setPositiveButton("Save", (dialog, which) -> {
                     // real handler is in onStart()
                 })
-                .setNegativeButton("Cancel", (dialog, which) -> {
-                    dialog.dismiss();
-                })
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .create();
     }
 
@@ -100,7 +97,7 @@ public class AddLocationDialogFragment extends DialogFragment {
             return;
         }
 
-        // v1: simple range sanity check (not exhaustive)
+        // Simple range sanity check (not exhaustive)
         if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
             Toast.makeText(requireContext(),
                     "Lat must be between -90 and 90, Lon between -180 and 180",
@@ -108,18 +105,12 @@ public class AddLocationDialogFragment extends DialogFragment {
             return;
         }
 
-        // Create a new HuntLocation.
-        // Adjust this constructor to match your actual HuntLocation definition.
-        // Here we use System.currentTimeMillis() as a simple unique id.
-        long newId = System.currentTimeMillis();
-        HuntLocation newLocation = new HuntLocation(newId, name, lat, lon);
+        // Create and store the location via repository (String UUID id inside).
+        HuntLocation newLocation = locationsRepository.addLocation(name, lat, lon);
 
-        Log.d(TAG, "onSaveClicked: adding new location: " + newLocation);
+        Log.d(TAG, "onSaveClicked: added new location: " + newLocation);
 
-        // Insert into repository (you may need to implement addLocation() if not present).
-        locationsRepository.addLocation(newLocation);
-
-        // Optionally also select it as current:
+        // Select it as the current location
         locationsRepository.selectLocation(newLocation);
 
         Toast.makeText(requireContext(), "Location added", Toast.LENGTH_SHORT).show();

@@ -35,10 +35,17 @@ public class HomeViewModel extends ViewModel {
     private static final String TAG = "HomeViewModel";
 
     // Weather + closet + locations
-    private final WeatherRepository weatherRepository = OpenMeteoWeatherRepository.getInstance();    // Alternate: use a singleton if you want shared weather cache
+    // Weather: OpenMeteo-backed singleton
+    private final WeatherRepository weatherRepository =
+            OpenMeteoWeatherRepository.getInstance();
 
-    private final ClosetRepository closetRepository = ClosetRepositoryProvider.get();
-    private final LocationsRepository locationsRepository = LocationsRepository.getInstance();
+    // Closet: Firestore-backed, provided via ClosetRepositoryProvider.init(...)
+    private final ClosetRepository closetRepository =
+            ClosetRepositoryProvider.get();
+
+    // Locations: current implementation (can later be swapped to Firestore-backed)
+    private final LocationsRepository locationsRepository =
+            LocationsRepository.getInstance();
 
     private final GearRecommender gearRecommender = new GearRecommender();
 
@@ -64,7 +71,7 @@ public class HomeViewModel extends ViewModel {
         // - When the user changes locations, HomeFragment calls onLocationSelected().
     }
 
-    // --- Locations API (used by HomeFragment) ---
+    // --- Locations API (used by HomeFragment) --------------------------------
 
     public LiveData<List<HuntLocation>> getLocations() {
         return locationsRepository.getLocations();
@@ -92,7 +99,7 @@ public class HomeViewModel extends ViewModel {
         // When weather finishes updating, HomeFragment's observer will call onWeatherUpdated().
     }
 
-    // --- Weather & Hunt window API ---
+    // --- Weather & Hunt window API -------------------------------------------
 
     public LiveData<WeatherResponse> getWeather() {
         return weatherRepository.getWeatherLiveData();
@@ -112,6 +119,13 @@ public class HomeViewModel extends ViewModel {
 
     public LiveData<HuntingStyle> getHuntingStyle() {
         return huntingStyleLiveData;
+    }
+
+    /**
+     * Optional: expose closet LiveData if the UI ever needs it directly.
+     */
+    public LiveData<List<GearItem>> getClosetGear() {
+        return closetRepository.getClosetLiveData();
     }
 
     public void setWeaponType(WeaponType type) {
@@ -146,7 +160,7 @@ public class HomeViewModel extends ViewModel {
         recomputeGear();
     }
 
-    // --- Core recompute logic: Weather + Closet + Selections → Outfit ---
+    // --- Core recompute logic: Weather + Closet + Selections → Outfit --------
 
     private void recomputeGear() {
         WeatherResponse response = weatherRepository.getWeatherLiveData().getValue();
@@ -161,7 +175,8 @@ public class HomeViewModel extends ViewModel {
             return;
         }
 
-        List<GearItem> closet = closetRepository.getAllGear().getValue();
+        // NOTE: ClosetRepository now exposes getClosetLiveData() instead of getAllGear().
+        List<GearItem> closet = closetRepository.getClosetLiveData().getValue();
         if (closet == null || closet.isEmpty()) {
             Log.w(TAG, "recomputeGear: closet is empty, no outfit can be built");
             gearLiveData.setValue(null);
@@ -447,8 +462,4 @@ public class HomeViewModel extends ViewModel {
         Double v = list.get(index);
         return v != null ? v : fallback;
     }
-
-    // Alternate approach:
-    // - Expose closet LiveData as well (getClosetGear()) if HomeFragment
-    //   ever needs to show “all gear vs recommended gear” side by side.
 }

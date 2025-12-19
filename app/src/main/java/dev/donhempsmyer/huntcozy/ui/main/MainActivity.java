@@ -14,6 +14,13 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import dev.donhempsmyer.huntcozy.R;
+import dev.donhempsmyer.huntcozy.data.locations.LocationsRepository;
+import dev.donhempsmyer.huntcozy.data.remote.FirestoreClosetRepository;
+import dev.donhempsmyer.huntcozy.data.remote.FirestoreLoadoutRepository;
+import dev.donhempsmyer.huntcozy.data.remote.FirestorePackingStateRepository;
+import dev.donhempsmyer.huntcozy.data.remote.UserFirestore;
+import dev.donhempsmyer.huntcozy.data.repository.ClosetRepository;
+import dev.donhempsmyer.huntcozy.data.repository.ClosetRepositoryProvider;
 import dev.donhempsmyer.huntcozy.data.seed.FirebaseSeeder;
 import dev.donhempsmyer.huntcozy.ui.auth.AuthActivity;
 import dev.donhempsmyer.huntcozy.ui.closet.ClosetFragment;
@@ -47,7 +54,22 @@ public class MainActivity extends AppCompatActivity {
 
         // Seed Firestore structure for this user on entry (idempotent)
         FirebaseFirestore db = FirebaseFirestore.getInstance();
+        UserFirestore userFs = new UserFirestore(db, user.getUid());
+
         FirebaseSeeder.seedStructureForUser(db, user.getUid());
+
+        // Closet
+        ClosetRepository closetRepo = new FirestoreClosetRepository(userFs);
+        ClosetRepositoryProvider.init(closetRepo);
+
+        // Locations
+        LocationsRepository.init(userFs);
+
+        //Loadouts
+        FirestoreLoadoutRepository.init(userFs);
+
+        //packing state
+        FirestorePackingStateRepository.init(userFs);
 
         setupToolbar();
         setupBottomNav();

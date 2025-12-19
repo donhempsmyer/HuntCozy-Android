@@ -1,7 +1,5 @@
 package dev.donhempsmyer.huntcozy.ui.locations;
 
-import android.util.Log;
-
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModel;
 
@@ -10,27 +8,25 @@ import java.util.List;
 import dev.donhempsmyer.huntcozy.data.locations.LocationsRepository;
 import dev.donhempsmyer.huntcozy.data.model.location.HuntLocation;
 
-/**
- * LocationsViewModel exposes the list of HuntLocation objects
- * for the LocationsFragment.
- */
 public class LocationsViewModel extends ViewModel {
 
-    private static final String TAG = "LocationsViewModel";
+    private final LocationsRepository locationsRepository;
 
-    private final LocationsRepository repository =
-            LocationsRepository.getInstance();
+    public LocationsViewModel() {
+        locationsRepository = LocationsRepository.getInstance();
+    }
 
     public LiveData<List<HuntLocation>> getLocations() {
-        return repository.getLocations();
+        return locationsRepository.getLocations();
     }
 
-    public void addLocation(String name, double lat, double lon) {
-        Log.d(TAG, "addLocation: name=" + name + " lat=" + lat + " lon=" + lon);
-        repository.addLocation(name, lat, lon);
+    public LiveData<HuntLocation> getSelectedLocation() {
+        return locationsRepository.getSelectedLocation();
     }
 
-    // Alternate approach:
-    // - Accept a DTO (LocationDraft) that has validation built-in
-    //   and then call repository.addLocation(draft).
+    public void selectLocation(HuntLocation loc) {
+        if (loc != null) {
+            locationsRepository.selectLocation(loc);
+        }
+    }
 }

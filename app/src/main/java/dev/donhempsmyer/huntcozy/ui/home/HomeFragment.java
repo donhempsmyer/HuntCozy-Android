@@ -673,30 +673,21 @@ public class HomeFragment extends Fragment {
         Log.d(TAG, "navigateToPackingList: clicked gear " +
                 (item != null ? item.getName() : "null"));
 
-        // 1) Share context with PackingListViewModel (weapon + style)
-        PackingListViewModel packingVM =
-                new ViewModelProvider(requireActivity()).get(PackingListViewModel.class);
+        // We don't push context or staged gear anymore:
+        //  - PackingListFragment observes HomeViewModel directly
+        //  - PackingListViewModel seeds from recommended only once
 
-        // Safely grab current weapon/style from HomeViewModel
-        WeaponType weapon = viewModel.getWeaponType().getValue();
-        HuntingStyle style = viewModel.getHuntingStyle().getValue();
-        packingVM.setContextFromHome(weapon, style);
-
-        List<GearItem> recommendedNow = viewModel.getGear().getValue();
-        if (recommendedNow != null) {
-            packingVM.setStagedFromHome(recommendedNow);   // <- you implement this in PackingListViewModel
-        }
-
-        // 2) Ask MainActivity to switch to the Packing tab so bottom nav stays in sync
         if (requireActivity() instanceof MainActivity) {
+            // Use MainActivity so bottom nav highlights "Packing"
             MainActivity activity = (MainActivity) requireActivity();
-            activity.openPackingTab();   // internally calls bottomNav.setSelectedItemId(R.id.nav_packing_list)
+            activity.openPackingTab();   // bottomNav.setSelectedItemId(R.id.nav_packing_list)
         } else {
             // Fallback: direct fragment transaction if host isn't MainActivity
             Log.w(TAG, "navigateToPackingList: host is not MainActivity, using direct transaction fallback");
             requireActivity().getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(R.id.main_fragment_container, PackingListFragment.newInstance())
+                    .replace(R.id.main_fragment_container,
+                            PackingListFragment.newInstance())
                     .addToBackStack(null)
                     .commit();
         }

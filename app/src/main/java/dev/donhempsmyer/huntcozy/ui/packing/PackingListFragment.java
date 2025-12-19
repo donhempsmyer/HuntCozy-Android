@@ -1,5 +1,6 @@
 package dev.donhempsmyer.huntcozy.ui.packing;
 
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -23,14 +24,6 @@ import dev.donhempsmyer.huntcozy.data.model.GearItem;
 import dev.donhempsmyer.huntcozy.data.model.PackingItem;
 import dev.donhempsmyer.huntcozy.ui.home.HomeViewModel;
 
-/**
- * PackingListFragment shows:
- *  - Staged clothing from the recommender
- *  - Loadout items (weapon, style, every-hunt, optional)
- *  - Packed items (checked-off)
- *
- * v2: connect to persistence (Firebase/Room) and richer loadout management.
- */
 public class PackingListFragment extends Fragment {
 
     private static final String TAG = "PackingListFragment";
@@ -89,6 +82,9 @@ public class PackingListFragment extends Fragment {
         // Local ViewModel for packing UI state
         packingViewModel = new ViewModelProvider(requireActivity()).get(PackingListViewModel.class);
 
+        // Restore packing session (staged/every/optional/packed) from Firestore, once per VM
+        packingViewModel.restoreStateIfNeeded();
+
         bindViews(view);
         setupAdapters();
         setupButtons();
@@ -135,7 +131,6 @@ public class PackingListFragment extends Fragment {
         stagedAdapter = new PackingListAdapter(PackingListAdapter.Mode.STAGED);
         recyclerStaged.setAdapter(stagedAdapter);
         stagedAdapter.setOnItemCheckedListener((item, checked) -> {
-            // When staged item is checked, move it to PACKED (via ViewModel)
             if (packingViewModel != null) {
                 Log.d(TAG, "stagedAdapter: onItemChecked item=" + item.getLabel() + " checked=" + checked);
                 packingViewModel.onStagedItemChecked(item, checked);
@@ -185,14 +180,12 @@ public class PackingListFragment extends Fragment {
         // Packed items (read-only checkboxes, still visually checked)
         packedAdapter = new PackingListAdapter(PackingListAdapter.Mode.PACKED);
         recyclerPacked.setAdapter(packedAdapter);
-
         packedAdapter.setOnItemCheckedListener((item, checked) -> {
             // For packed list, we care about UN-check (moving back)
             if (!checked && packingViewModel != null) {
                 packingViewModel.onPackedItemUnchecked(item);
             }
         });
-
     }
 
     private void setupButtons() {
@@ -229,14 +222,19 @@ public class PackingListFragment extends Fragment {
         // Optional items: multi-choice from candidates not already used
         buttonEditOptional.setOnClickListener(v -> {
             List<PackingItem> candidates = packingViewModel.getAvailableOptionalCandidates();
+
             if (candidates == null || candidates.isEmpty()) {
-                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                        .setMessage("No additional optional items available.")
-                        .setPositiveButton("OK", null)
-                        .show();
+                // No catalog yet → let user type a multiline list
+                String initial = packingViewModel.getOptionalText();
+                showMultilineEditDialog(
+                        "Edit Optional Items",
+                        initial,
+                        text -> packingViewModel.setOptionalFromText(text)
+                );
                 return;
             }
 
+            // Otherwise, show the multi-choice "add from catalog" dialog
             CharSequence[] labels = new CharSequence[candidates.size()];
             final boolean[] checked = new boolean[candidates.size()];
             for (int i = 0; i < candidates.size(); i++) {
@@ -244,7 +242,7 @@ public class PackingListFragment extends Fragment {
                 checked[i] = false;
             }
 
-            new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            new AlertDialog.Builder(requireContext())
                     .setTitle("Add Optional Items")
                     .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> {
                         checked[which] = isChecked;
@@ -316,15 +314,10 @@ public class PackingListFragment extends Fragment {
             packedAdapter.setItems(items);
         });
 
-        // Recommended clothing from Home → staged list (if empty)
-        homeViewModel.getGear().observe(getViewLifecycleOwner(), recommended -> {
-            int count = (recommended != null) ? recommended.size() : 0;
-            Log.d(TAG, "PackingListFragment: observed recommended gear count=" + count);
-            packingViewModel.setStagedFromRecommendedIfEmpty(recommended);
-        });
-
-        // Weapon & style subtitles under section headers
+        // 🔹 1) Weapon & style subtitles under section headers + notify ViewModel of context
         homeViewModel.getWeaponType().observe(getViewLifecycleOwner(), type -> {
+            Log.d(TAG, "observe weaponType: " + type);
+            packingViewModel.onWeaponTypeChanged(type);
             if (type != null) {
                 textWeaponSubtitle.setText("(" + type.name() + ")");
             } else {
@@ -333,12 +326,31 @@ public class PackingListFragment extends Fragment {
         });
 
         homeViewModel.getHuntingStyle().observe(getViewLifecycleOwner(), style -> {
+            Log.d(TAG, "observe huntingStyle: " + style);
+            packingViewModel.onHuntingStyleChanged(style);
             if (style != null) {
                 textStyleSubtitle.setText("(" + style.name() + ")");
             } else {
                 textStyleSubtitle.setText("");
             }
         });
+
+        // 🔹 2) Recommended clothing from Home → staged list (if empty / no packing yet)
+        // This runs AFTER weapon/style have potentially cleared / changed the session.
+        homeViewModel.getGear().observe(getViewLifecycleOwner(), recommended -> {
+            int count = (recommended != null) ? recommended.size() : 0;
+            Log.d(TAG, "PackingListFragment: observed recommended gear count=" + count);
+            packingViewModel.setStagedFromRecommendedIfEmpty(recommended);
+        });
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (packingViewModel != null) {
+            Log.d(TAG, "onPause: saving packing state");
+            packingViewModel.saveCurrentState();
+        }
     }
 
     // ===== Dialog helpers =====
@@ -365,8 +377,4 @@ public class PackingListFragment extends Fragment {
                 .setNegativeButton("Cancel", null)
                 .show();
     }
-
-    // Alternate approach:
-    // - Use Navigation Component with Safe Args to pass weapon/style context.
-    // - Persist loadout definitions via Room and let the ViewModel query them.
 }

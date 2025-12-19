@@ -1,38 +1,48 @@
 package dev.donhempsmyer.huntcozy.data.model.location;
 
-import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
-/**
- * HuntLocation represents a saved hunting location with lat/long.
- *
- * v1:
- *  - simple in-memory objects, seeded with a few examples.
- * v2:
- *  - persist with Room/Firebase and add fields like wind access, notes, etc.
- */
 public class HuntLocation {
 
-    private final long id;          // simple unique id (v1: from seeder)
-    @NonNull
-    private final String name;      // "North Ridge Stand"
-    private final double latitude;  // decimal degrees
-    private final double longitude; // decimal degrees
+    private final String id;       // now String, aligns with Firestore doc id
+    private final String name;
+    private final double latitude;
+    private final double longitude;
+    @Nullable
+    private final String timeZoneId;
+    @Nullable
+    private final String notes;
 
-    public HuntLocation(long id,
-                        @NonNull String name,
+    // Primary constructor used by Firestore + app code
+    public HuntLocation(String id,
+                        String name,
                         double latitude,
-                        double longitude) {
+                        double longitude,
+                        @Nullable String timeZoneId,
+                        @Nullable String notes) {
         this.id = id;
         this.name = name;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.timeZoneId = timeZoneId;
+        this.notes = notes;
     }
 
-    public long getId() {
+    // Optional: legacy convenience constructor if you still have places using long
+    // You can keep this for now to reduce compile errors, then migrate callers.
+    public HuntLocation(long numericId,
+                        String name,
+                        double latitude,
+                        double longitude,
+                        @Nullable String timeZoneId,
+                        @Nullable String notes) {
+        this(String.valueOf(numericId), name, latitude, longitude, timeZoneId, notes);
+    }
+
+    public String getId() {
         return id;
     }
 
-    @NonNull
     public String getName() {
         return name;
     }
@@ -45,19 +55,25 @@ public class HuntLocation {
         return longitude;
     }
 
-    @NonNull
+    @Nullable
+    public String getTimeZoneId() {
+        return timeZoneId;
+    }
+
+    @Nullable
+    public String getNotes() {
+        return notes;
+    }
+
     @Override
     public String toString() {
         return "HuntLocation{" +
-                "id=" + id +
+                "id='" + id + '\'' +
                 ", name='" + name + '\'' +
                 ", lat=" + latitude +
                 ", lon=" + longitude +
+                ", timeZoneId='" + timeZoneId + '\'' +
+                ", notes='" + notes + '\'' +
                 '}';
     }
-
-    // Alternate approach:
-    // - Add fields like "isDefault", "accessDirection", "notes"
-    //   and let the recommendation system reason about them later
-    //   (e.g., wind direction vs stand access).
 }

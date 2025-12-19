@@ -47,19 +47,10 @@ import dev.donhempsmyer.huntcozy.ui.home.ForecastAdapter;
 public class ConditionsFragment extends Fragment {
 
     private static final String TAG = "ConditionsFragment";
-    private static final String ARG_LOCATION_ID = "arg_location_id";
 
-    public static ConditionsFragment newInstance(long locationId) {
-        ConditionsFragment f = new ConditionsFragment();
-        Bundle args = new Bundle();
-        args.putLong(ARG_LOCATION_ID, locationId);
-        f.setArguments(args);
-        return f;
-    }
-
+    // We no longer pass a location ID via arguments; everything comes
+    // from LocationsRepository.getSelectedLocation().
     public static ConditionsFragment newInstance() {
-        // No specific location id passed; fragment will rely on
-        // LocationsRepository.getSelectedLocation() or default.
         return new ConditionsFragment();
     }
 
@@ -75,7 +66,7 @@ public class ConditionsFragment extends Fragment {
     private LineChart chartWind;
     private BarChart chartPrecip;
     private LineChart chartPressure;
-    private android.widget.Button buttonBackToWeekly; // NEW
+    private android.widget.Button buttonBackToWeekly;
 
     private ForecastAdapter forecastAdapter;
     private ArrayAdapter<String> locationAdapter;
@@ -106,12 +97,6 @@ public class ConditionsFragment extends Fragment {
         setupLocationSpinner();
         setupForecastRecycler();
         observeData();
-
-        // If a location id was passed in, select it
-        long passedId = getArguments() != null ? getArguments().getLong(ARG_LOCATION_ID, -1) : -1;
-        if (passedId != -1) {
-            selectLocationById(passedId);
-        }
     }
 
     private void bindViews(View root) {
@@ -130,7 +115,7 @@ public class ConditionsFragment extends Fragment {
         // Back button: return to weekly overview charts
         buttonBackToWeekly.setOnClickListener(v -> {
             if (lastWeather != null) {
-                populateWeeklyCharts(lastWeather); // resets charts to weekly mode
+                populateWeeklyCharts(lastWeather);
             }
         });
 
@@ -157,6 +142,8 @@ public class ConditionsFragment extends Fragment {
                 if (position < 0 || position >= locationItems.size()) return;
                 HuntLocation loc = locationItems.get(position);
                 Log.d(TAG, "spinnerLocation onItemSelected: " + loc);
+
+                // Update selected location and refresh weather
                 locationsRepository.selectLocation(loc);
                 weatherRepository.refreshWeatherForLocation(
                         loc.getLatitude(),
@@ -183,6 +170,7 @@ public class ConditionsFragment extends Fragment {
     }
 
     private void observeData() {
+        // Locations list
         locationsRepository.getLocations().observe(getViewLifecycleOwner(), locations -> {
             Log.d(TAG, "observeData: locations size=" + (locations != null ? locations.size() : 0));
             locationItems.clear();
@@ -198,33 +186,36 @@ public class ConditionsFragment extends Fragment {
             syncSpinnerWithSelectedLocation();
         });
 
+        // Selected location
         locationsRepository.getSelectedLocation().observe(getViewLifecycleOwner(), selected -> {
             Log.d(TAG, "observeData: selectedLocation=" + selected);
             syncSpinnerWithSelectedLocation();
         });
 
+        // Weather updates
         weatherRepository.getWeatherLiveData().observe(getViewLifecycleOwner(), weather -> {
             Log.d(TAG, "observeData: weather updated in ConditionsFragment");
             lastWeather = weather;
 
-            // 7-day strip at top
             populateDailyForecast(weather);
-
-            // Default charts: weekly overview across 7 days (2-hour steps)
             populateWeeklyCharts(weather);
-
-            // When user taps a day card, updateChartsForDay(dayIndex) will override
-            // these charts with per-day detail.
         });
     }
 
+    /**
+     * Makes sure the spinner selection matches LocationsRepository.getSelectedLocation().
+     */
     private void syncSpinnerWithSelectedLocation() {
         HuntLocation selected = locationsRepository.getSelectedLocation().getValue();
         if (selected == null || locationItems.isEmpty()) return;
 
+        String selectedId = selected.getId(); // now a String
+        if (selectedId == null) return;
+
         int index = -1;
         for (int i = 0; i < locationItems.size(); i++) {
-            if (locationItems.get(i).getId() == selected.getId()) {
+            HuntLocation item = locationItems.get(i);
+            if (item.getId() != null && item.getId().equals(selectedId)) {
                 index = i;
                 break;
             }
@@ -236,20 +227,7 @@ public class ConditionsFragment extends Fragment {
         }
     }
 
-    private void selectLocationById(long id) {
-        HuntLocation selected = null;
-        for (HuntLocation loc : locationItems) {
-            if (loc.getId() == id) {
-                selected = loc;
-                break;
-            }
-        }
-        if (selected != null) {
-            locationsRepository.selectLocation(selected);
-        }
-    }
-
-    // --- 7-day DAILY strip (same as before, but wired to new adapter API) -----
+    // --- 7-day DAILY strip ---------------------------------------------------
 
     private void populateDailyForecast(WeatherResponse response) {
         if (response == null || response.daily == null) return;
@@ -259,7 +237,7 @@ public class ConditionsFragment extends Fragment {
         List<String> labels = new ArrayList<>();
         List<String> primaryValues = new ArrayList<>();   // temp range
         List<String> secondaryValues = new ArrayList<>(); // precip/snow summary
-        List<String> markers = new ArrayList<>();         // reserved for later
+        List<String> markers = new ArrayList<>();
 
         java.text.SimpleDateFormat inputFormat =
                 new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
@@ -304,7 +282,7 @@ public class ConditionsFragment extends Fragment {
             );
             secondaryValues.add(precipSummary);
 
-            markers.add(""); // could mark "Best" day later
+            markers.add(""); // future: "Best" hunting day, etc.
         }
 
         textForecastTitle.setText("7-Day Forecast");
@@ -312,7 +290,7 @@ public class ConditionsFragment extends Fragment {
         forecastAdapter.setData(labels, primaryValues, secondaryValues, markers);
     }
 
-    // --- Weekly charts across 7 days (2h step) --------------------------------
+    // --- Weekly charts across 7 days (2h step) -------------------------------
 
     private void populateWeeklyCharts(WeatherResponse response) {
         if (response == null || response.hourly == null) {
@@ -338,7 +316,7 @@ public class ConditionsFragment extends Fragment {
         java.text.SimpleDateFormat inputFormat =
                 new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.US);
         java.text.SimpleDateFormat labelFormat =
-                new java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.US); // "Mon 06:00"
+                new java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.US);
 
         int stepIndex = 0;
         for (int i = 0; i < maxHours; i += 2, stepIndex++) {
@@ -369,8 +347,7 @@ public class ConditionsFragment extends Fragment {
                     response.current != null ? response.current.barometricPressure : 0.0);
             double pressureInHg = hPaToInHg(pressureHpa);
 
-
-            float x = stepIndex; // index-based x; labeled via xLabels
+            float x = stepIndex;
 
             tempEntries.add(new Entry(x, (float) temp));
             windEntries.add(new Entry(x, (float) windSpeed));
@@ -390,10 +367,8 @@ public class ConditionsFragment extends Fragment {
         }
     }
 
-    /**
-     * Per-day detail when user taps a card in the 7-day strip.
-     * Uses the same charts but focuses only on that date.
-     */
+    // --- Per-day detail ------------------------------------------------------
+
     private void updateChartsForDay(int dayIndex) {
         if (lastWeather == null || lastWeather.hourly == null || lastWeather.daily == null) {
             Log.w(TAG, "updateChartsForDay: missing weather data");
@@ -434,7 +409,6 @@ public class ConditionsFragment extends Fragment {
                     lastWeather.current != null ? lastWeather.current.barometricPressure : 0.0);
             double pressureInHg = hPaToInHg(pressureHpa);
 
-
             tempEntries.add(new Entry(hourIndexForX, (float) temp));
             windEntries.add(new Entry(hourIndexForX, (float) wind));
             precipEntries.add(new BarEntry(hourIndexForX, (float) precip));
@@ -460,12 +434,6 @@ public class ConditionsFragment extends Fragment {
 
     // --- Chart appearance ----------------------------------------------------
 
-    /**
-     * Configure chart colors for dark background:
-     *  - white axis/labels/legend text
-     *  - soft grid lines
-     *  - transparent background to blend with fragment bg
-     */
     private void setupChartsAppearance() {
         styleLineChart(chartTemp);
         styleLineChart(chartWind);
@@ -539,7 +507,7 @@ public class ConditionsFragment extends Fragment {
         }
     }
 
-    // --- Reusable binding helpers -------------------------------------------
+    // --- Reusable chart binding helpers -------------------------------------
 
     private void bindLineChart(LineChart chart,
                                String label,
@@ -556,7 +524,7 @@ public class ConditionsFragment extends Fragment {
         dataSet.setDrawCircles(false);
         dataSet.setDrawValues(false);
         dataSet.setMode(LineDataSet.Mode.CUBIC_BEZIER);
-        dataSet.setColor(0xFFFFFFFF);     // white line
+        dataSet.setColor(0xFFFFFFFF);
         dataSet.setHighLightColor(0xFFAAAAAA);
 
         LineData data = new LineData(dataSet);
@@ -595,11 +563,10 @@ public class ConditionsFragment extends Fragment {
 
         BarDataSet dataSet = new BarDataSet(entries, label);
         dataSet.setDrawValues(false);
-        dataSet.setColor(0xFFFFFFFF);   // white bars
+        dataSet.setColor(0xFFFFFFFF);
 
         BarData data = new BarData(dataSet);
         data.setBarWidth(0.8f);
-
         chart.setData(data);
 
         XAxis xAxis = chart.getXAxis();
@@ -626,10 +593,10 @@ public class ConditionsFragment extends Fragment {
 
     // --- Small utility -------------------------------------------------------
 
-    // Convert from hPa (Open-Meteo default) to inHg for display
     private double hPaToInHg(double hPa) {
-        return hPa * 0.0295299830714; // 1 hPa ≈ 0.02953 inHg
+        return hPa * 0.0295299830714;
     }
+
     private double safeGetDouble(List<Double> list, int index, double fallback) {
         if (list == null || index < 0 || index >= list.size()) return fallback;
         Double v = list.get(index);
