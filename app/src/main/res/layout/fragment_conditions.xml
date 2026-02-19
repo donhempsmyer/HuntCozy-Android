@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/conditions_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Full-bleed background image (match Home/Locations/Closet) -->
+    <ImageView
+        android:id="@+id/image_background_forest_conditions"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_winter_forest_dark" />
+
+    <!-- Dark scrim for contrast -->
+    <View
+        android:id="@+id/conditions_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000" />
+
+    <!-- Scrollable foreground content -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/conditions_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        android:paddingTop="24dp"
+        android:paddingBottom="16dp"
+        android:background="@android:color/transparent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:fitsSystemWindows="true"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp">
+
+            <!-- Header (matches Locations/Closet style) -->
+            <TextView
+                android:id="@+id/text_conditions_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Conditions"
+                android:textColor="@android:color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/text_conditions_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Seven-day outlook and hourly charts for your stands."
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:alpha="0.8"
+                android:layout_marginTop="2dp" />
+
+            <!-- LOCATION SELECTOR CARD -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_conditions_location"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp"
+                app:cardUseCompatPadding="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/text_conditions_forecast_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="7-Day Forecast"
+                        android:textColor="@android:color/white"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spinner_location_conditions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#ABFFFFFF"
+                        android:padding="4dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 7-DAY FORECAST STRIP CARD -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_conditions_forecast"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp"
+                app:cardUseCompatPadding="true">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_conditions_forecast"
+                    android:layout_width="match_parent"
+                    android:layout_height="110dp"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:paddingBottom="8dp"
+                    android:clipToPadding="false" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- CHARTS CARD -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_conditions_charts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#33FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="3dp"
+                app:cardUseCompatPadding="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <!-- Title row + "Back to week" button -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/text_conditions_chart_title"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Weekly overview (2-hour steps)"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold" />
+
+                        <Button
+                            android:id="@+id/button_conditions_back_to_week"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Back to week"
+                            android:textAllCaps="false"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <!-- Temperature chart -->
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chart_temp"
+                        android:layout_width="match_parent"
+                        android:layout_height="160dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@android:color/transparent" />
+
+                    <!-- Wind chart -->
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chart_wind"
+                        android:layout_width="match_parent"
+                        android:layout_height="160dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@android:color/transparent" />
+
+                    <!-- Precipitation chart (BAR) -->
+                    <com.github.mikephil.charting.charts.BarChart
+                        android:id="@+id/chart_precip"
+                        android:layout_width="match_parent"
+                        android:layout_height="160dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@android:color/transparent" />
+
+                    <!-- Pressure chart -->
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chart_pressure"
+                        android:layout_width="match_parent"
+                        android:layout_height="160dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="4dp"
+                        android:background="@android:color/transparent" />
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</FrameLayout>

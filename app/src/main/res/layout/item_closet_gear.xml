@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    app:cardUseCompatPadding="true"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#40FFFFFF"
+    app:cardBackgroundColor="#33000000"
+    android:foreground="?attr/selectableItemBackground">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp">
+
+        <!-- Name + optional "Favorite"/"Go-To" pill -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/text_gear_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Lofted insulated jacket"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="@android:color/white" />
+
+            <!-- Optional badge: you can toggle this from code if you add a flag -->
+            <TextView
+                android:id="@+id/text_gear_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="Go-To"
+                android:textSize="11sp"
+                android:textColor="@android:color/black"
+                android:background="@drawable/bg_location_badge"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Body zone + layer type -->
+        <TextView
+            android:id="@+id/text_gear_zone_layer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="TORSO · INSULATION"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:alpha="0.9" />
+
+        <!-- Material -->
+        <TextView
+            android:id="@+id/text_gear_material"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Synthetic insulation"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:alpha="0.85" />
+
+        <!-- Attributes / rating line -->
+        <TextView
+            android:id="@+id/text_gear_attributes"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Ins 8 • Wind 4 • Water 3 • Breath 4"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:alpha="0.8" />
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

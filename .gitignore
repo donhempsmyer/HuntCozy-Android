@@ -12,6 +12,9 @@ app/build/
 # Local configuration
 local.properties
 
+.secrets
+.env
+google-services.json
 # Native / external builds
 .externalNativeBuild/
 .cxx/

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/locations_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Full-bleed background image (same as Home) -->
+    <ImageView
+        android:id="@+id/image_background_forest_locations"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_winter_forest_dark" />
+
+    <!-- Dark scrim for contrast -->
+    <View
+        android:id="@+id/locations_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000" />
+
+    <!-- Foreground content with Coordinator so FAB anchoring still works -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:id="@+id/layout_locations_content"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fitsSystemWindows="true"
+            android:padding="16dp">
+
+            <!-- Title block -->
+            <TextView
+                android:id="@+id/text_locations_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="My Locations"
+                android:textStyle="bold"
+                android:textSize="22sp"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/text_locations_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Saved stands, blinds, and access points."
+                android:textSize="14sp"
+                android:textColor="@android:color/white"
+                android:alpha="0.8"
+                android:layout_marginTop="2dp" />
+
+            <!-- Card wrapping the list so it matches Home/Conditions style -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_locations_list"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="12dp"
+                app:cardCornerRadius="12dp"
+                app:cardUseCompatPadding="true"
+                app:cardElevation="3dp"
+                app:cardBackgroundColor="#33FFFFFF">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recycler_locations"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:paddingBottom="72dp" />
+
+                    <!-- Empty state centered inside the card -->
+                    <TextView
+                        android:id="@+id/text_empty_locations"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No locations yet.\nTap + to add your first stand."
+                        android:textColor="@android:color/white"
+                        android:textSize="14sp"
+                        android:gravity="center"
+                        android:alpha="0.9"
+                        android:layout_gravity="center"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+
+        <!-- FAB for adding new locations -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_add_location"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:contentDescription="Add location"
+            app:backgroundTint="#739571"
+            app:layout_anchor="@id/layout_locations_content"
+            app:layout_anchorGravity="bottom|end"
+            app:srcCompat="@drawable/ic_add"
+            app:tint="@android:color/white" />
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+</FrameLayout>
