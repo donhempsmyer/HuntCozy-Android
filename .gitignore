@@ -1,33 +1,57 @@
+# Built artifacts
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+
 # IDE files
-*.iml
 .idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
 .DS_Store
+captures/
 
 # Gradle
 .gradle/
 build/
 app/build/
 */build/
-
-# Local configuration
 local.properties
+gradle-app.setting
+.gradle-snapshot-history
 
+# Secrets & Configuration
+google-services.json
 .secrets
 .env
-google-services.json
-# Native / external builds
-.externalNativeBuild/
-.cxx/
-
-# Captures
-captures/
-
-# Logs
-*.log
-
-# Signed artifacts
-*.apk
-*.aab
 *.keystore
 *.jks
 *.pem
+*.p12
+mock-services.json
+
+# External native builds
+.externalNativeBuild/
+.cxx/
+cmake_install.cmake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+install_manifest.txt
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*.swp
+*~

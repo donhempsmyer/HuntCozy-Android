@@ -113,7 +113,7 @@ public class GearRecommender {
 
         // For style-based tweaks, also use RAW temp (same reason: more stable bands).
         List<OutfitSlot> desiredSlots =
-                determineDesiredSlots(tempBand, precipBand, windMph, huntingStyle, rawTempF);
+                determineDesiredSlots(tempBand, precipBand, windMph, huntingStyle, rawTempF, weaponType);
 
         for (OutfitSlot slot : desiredSlots) {
             Log.d(TAG, "desired slot: " + slot);
@@ -294,7 +294,8 @@ public class GearRecommender {
             PrecipBand precipBand,
             double windMph,
             HuntingStyle style,
-            double apparentTempF
+            double apparentTempF,
+            WeaponType weaponType
     ) {
         List<OutfitSlot> slots = new ArrayList<>();
 
@@ -310,9 +311,15 @@ public class GearRecommender {
         // HEAD logic
         slots.addAll(desiredHeadSlots(adjustedBand, precipBand));
 
+        // FACE & NECK logic
+        slots.addAll(desiredFaceNeckSlots(adjustedBand));
+
         // HANDS & FEET
         slots.addAll(desiredHandSlots(adjustedBand, precipBand));
         slots.addAll(desiredFeetSlots(adjustedBand, precipBand));
+
+        // ACCESSORIES (Weapon & Style)
+        slots.addAll(desiredAccessorySlots(weaponType, style));
 
         return slots;
     }
@@ -331,8 +338,8 @@ public class GearRecommender {
 
         switch (tempBand) {
             case HOT:
-                // No base layer in HOT band.
-                // Only add an outer layer if wind/wet justify it.
+                // Basic shirt always required
+                slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.BASE, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.RAIN, true));
                 } else if (windy) {
@@ -341,6 +348,8 @@ public class GearRecommender {
                 break;
 
             case MILD:
+                // Base + Mid for mild
+                slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.BASE, true));
                 slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.MID, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.TORSO, LayerType.RAIN, true));
@@ -397,14 +406,15 @@ public class GearRecommender {
 
         switch (tempBand) {
             case HOT:
-                // No leg base layer in HOT — assume main pant handles it.
-                break;
-
             case MILD:
+                // Primary pant (SHELL) required
+                slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.SHELL, true));
                 break;
 
             case COOL:
+                // Base layer + primary pant
                 slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.BASE, true));
+                slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.SHELL, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.RAIN, true));
                 }
@@ -415,6 +425,9 @@ public class GearRecommender {
                 slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.INSULATION, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.RAIN, true));
+                } else {
+                    // Shell is optional if we have heavy insulation/bibs
+                    slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.SHELL, false));
                 }
                 break;
 
@@ -424,6 +437,8 @@ public class GearRecommender {
                 slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.INSULATION, true));
                 if (wet) {
                     slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.RAIN, true));
+                } else {
+                    slots.add(new OutfitSlot(BodyZone.LEGS, LayerType.SHELL, false));
                 }
                 break;
         }
@@ -565,6 +580,38 @@ public class GearRecommender {
                     slots.add(new OutfitSlot(BodyZone.FEET, LayerType.RAIN, true));
                 }
                 break;
+        }
+
+        return slots;
+    }
+
+    private List<OutfitSlot> desiredFaceNeckSlots(TempBand tempBand) {
+        List<OutfitSlot> slots = new ArrayList<>();
+        // Face/Neck gaiters are usually MID or BASE layers
+        if (tempBand == TempBand.COOL || tempBand == TempBand.COLD || tempBand == TempBand.VERY_COLD) {
+            slots.add(new OutfitSlot(BodyZone.FACE, LayerType.MID, false));
+            slots.add(new OutfitSlot(BodyZone.NECK, LayerType.MID, false));
+        }
+        return slots;
+    }
+
+    private List<OutfitSlot> desiredAccessorySlots(WeaponType weaponType, HuntingStyle style) {
+        List<OutfitSlot> slots = new ArrayList<>();
+
+        // Weapon-specific slots
+        if (weaponType != null) {
+            // These might be tagged as WEAPON_ACCESSORY with various LayerTypes,
+            // but SHELL is a safe bet for generic gear.
+            slots.add(new OutfitSlot(BodyZone.WEAPON_ACCESSORY, LayerType.SHELL, false));
+        }
+
+        // Style-specific slots
+        if (style == HuntingStyle.TREESTAND) {
+            // Treestand hunters often need a harness (PACK/SHELL)
+            slots.add(new OutfitSlot(BodyZone.PACK, LayerType.SHELL, false));
+        } else {
+            // General pack slot for other styles
+            slots.add(new OutfitSlot(BodyZone.PACK, LayerType.SHELL, false));
         }
 
         return slots;

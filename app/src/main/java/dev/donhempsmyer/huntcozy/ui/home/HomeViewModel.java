@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -63,12 +64,26 @@ public class HomeViewModel extends ViewModel {
     private final MutableLiveData<List<GearItem>> gearLiveData =
             new MutableLiveData<>();
 
+    private final androidx.lifecycle.Observer<List<GearItem>> closetObserver = closet -> {
+        Log.d(TAG, "closetObserver: closet updated, count=" + (closet != null ? closet.size() : 0));
+        recomputeGear();
+    };
+
     public HomeViewModel() {
         Log.d(TAG, "constructor: HomeViewModel created");
         // NOTE:
         // - LocationsRepository is responsible for seeding default locations
         //   and setting an initial selectedLocation.
         // - When the user changes locations, HomeFragment calls onLocationSelected().
+
+        // Observe closet changes so we recompute if the user adds/removes gear
+        closetRepository.getClosetLiveData().observeForever(closetObserver);
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        closetRepository.getClosetLiveData().removeObserver(closetObserver);
     }
 
     // --- Locations API (used by HomeFragment) --------------------------------
@@ -169,6 +184,12 @@ public class HomeViewModel extends ViewModel {
         HuntWindow huntWindow = huntWindowLiveData.getValue();
         HuntLocation loc = locationsRepository.getSelectedLocation().getValue();
 
+        Log.d(TAG, "recomputeGear: checking dependencies...");
+        if (response == null) Log.d(TAG, "recomputeGear: weather response is null");
+        if (weaponType == null) Log.d(TAG, "recomputeGear: weaponType is null");
+        if (huntingStyle == null) Log.d(TAG, "recomputeGear: huntingStyle is null");
+        if (huntWindow == null) Log.d(TAG, "recomputeGear: huntWindow is null");
+
         if (response == null || response.current == null ||
                 weaponType == null || huntingStyle == null || huntWindow == null) {
             Log.d(TAG, "recomputeGear: missing weather, selections, or huntWindow; skipping");
@@ -178,13 +199,17 @@ public class HomeViewModel extends ViewModel {
         // NOTE: ClosetRepository now exposes getClosetLiveData() instead of getAllGear().
         List<GearItem> closet = closetRepository.getClosetLiveData().getValue();
         if (closet == null || closet.isEmpty()) {
-            Log.w(TAG, "recomputeGear: closet is empty, no outfit can be built");
-            gearLiveData.setValue(null);
+            Log.w(TAG, "recomputeGear: closet is " + (closet == null ? "null" : "empty") + ", no outfit can be built");
+            gearLiveData.setValue(new ArrayList<>()); // Use empty list instead of null to clear UI
             return;
         }
 
         // Use aggregated "hunt window" weather rather than just current conditions
         CurrentWeather windowWeather = deriveWindowWeather(response, huntWindow);
+        if (windowWeather == null) {
+            Log.e(TAG, "recomputeGear: windowWeather derived as null, using current as fallback");
+            windowWeather = response.current;
+        }
 
         List<GearItem> outfit = gearRecommender.buildOutfitFromCloset(
                 closet,
@@ -193,8 +218,9 @@ public class HomeViewModel extends ViewModel {
                 huntingStyle
         );
 
-        Log.d(TAG, "recomputeGear: window=" + huntWindow
-                + " outfit size=" + (outfit != null ? outfit.size() : 0));
+        Log.d(TAG, "recomputeGear: success! window=" + huntWindow
+                + " closetSize=" + closet.size()
+                + " outfitSize=" + (outfit != null ? outfit.size() : 0));
 
         Log.d(TAG, "recomputeGear: location="
                 + (loc != null ? loc.getName() : "null")
